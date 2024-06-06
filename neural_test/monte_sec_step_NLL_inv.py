@@ -27,25 +27,29 @@ def mc_integration(integrand, tau_values, lambda_2):
 def integral_equation_1_direct(lambda_0, lambda_1, lambda_2):
     C2 = kap_2+lambda_2
     C1 = kap_1+lambda_1
-    part = (2*C2*torch.log(tau_i)+C1)/(2*(C2-lambda_2)*torch.log(tau_i)+(C1-lambda_1))
+    part = (2*C2*torch.log(tau_i)+C1)/(2*(C2-lambda_2)*torch.log(tau_i)+2*(C1-lambda_1))
     expon = torch.exp(-1 - lambda_0 - lambda_1 * torch.log(tau_i) - lambda_2 * torch.log(tau_i)**2)
-    integral = mc_integration(expon*part, tau_i, lambda_2)
+    norm = expon*part
+    integral = mc_integration(expon*part, tau_i, lambda_2)/mc_integration(expon*part, tau_i, lambda_2)
     return integral - 1
 
 def integral_equation_2_direct(lambda_0, lambda_1, lambda_2):
     C2 = kap_2+lambda_2
     C1 = kap_1+lambda_1
-    part = (2*C2*torch.log(tau_i)+C1)/(2*(C2-lambda_2)*torch.log(tau_i)+(C1-lambda_1))
-    expon = torch.exp(-1 - lambda_0 - lambda_1 * torch.log(tau_i) - lambda_2 * torch.log(tau_i)**2) * torch.log(tau_i)
-    integral = mc_integration(expon*part, tau_i,lambda_2)
+    part = (2*C2*torch.log(tau_i)+C1)/(2*(C2-lambda_2)*torch.log(tau_i)+2*(C1-lambda_1))
+    expon = torch.exp(-1 - lambda_0 - lambda_1 * torch.log(tau_i) - lambda_2 * torch.log(tau_i)**2) 
+    norm = expon*part
+    moment = torch.log(tau_i)
+    integral = mc_integration(expon*part*moment, tau_i,lambda_2)/mc_integration(expon*part, tau_i,lambda_2)
     return integral + (np.sqrt(3)*np.pi*np.exp(3*alpha_s/(4*np.pi))*erfc(np.sqrt(alpha_s)/2*np.sqrt(3/np.pi))/(4*np.sqrt(alpha_s)))
 
 def integral_equation_3_direct(lambda_0, lambda_1, lambda_2):
     C2 = kap_2+lambda_2
     C1 = kap_1+lambda_1
-    part = (2*C2*torch.log(tau_i)+C1)/(2*(C2-lambda_2)*torch.log(tau_i)+(C1-lambda_1))
-    expon = torch.exp(-1 - lambda_0 - lambda_1 * torch.log(tau_i) - lambda_2 * torch.log(tau_i)**2) * torch.log(tau_i)**2
-    integral = mc_integration(expon*part, tau_i, lambda_2)
+    part = (2*C2*torch.log(tau_i)+C1)/(2*(C2-lambda_2)*torch.log(tau_i)+2*(C1-lambda_1))
+    expon = torch.exp(-1 - lambda_0 - lambda_1 * torch.log(tau_i) - lambda_2 * torch.log(tau_i)**2) 
+    moment = torch.log(tau_i)**2
+    integral = mc_integration(expon*part*moment, tau_i, lambda_2)/mc_integration(expon*part, tau_i, lambda_2)
     return integral + 3*np.pi/(8*alpha_s)*(-2 + np.sqrt(3)*np.sqrt(alpha_s)*np.exp(3*alpha_s/(4*np.pi))*erfc(np.sqrt(alpha_s)/2*np.sqrt(3/np.pi)) )
 
 # Initialize the Lagrange multipliers

@@ -11,7 +11,7 @@ n_samp=100
 # Dataset of {tau_i, q_tau_i} pairs
 r_i = torch.rand(n_samp)
 kap_1 = -6*alpha_s/(3*np.pi)/2
-kap_2 = 4*alpha_s/(3*np.pi)
+kap_2 = 4*alpha_s/(3*np.pi)/2
 tau_i = torch.exp(-np.sqrt(-torch.log(r_i)/kap_2+kap_1**2/4/kap_2**2)-kap_1/2/kap_2)
 #loop until tau_i falls below LQCD/MZ (Lep) ~ 10^-4
 #then sum and define it to be tau_i
@@ -54,7 +54,7 @@ lambda_1 = torch.tensor([-6 * alpha_s / (3 * np.pi)*0], requires_grad=True)
 lambda_2 = torch.tensor([4 * alpha_s / (3 * np.pi)*0], requires_grad=True)
 
 # Define the optimizer
-optimizer = optim.Adam([lambda_1], lr=0.001)
+optimizer = optim.Adam([lambda_0,lambda_1,lambda_2], lr=0.001)
 print("kap_1 = ", kap_1)
 print("kap_2 = ", kap_2)
 # Optimization loop
