@@ -1,0 +1,87 @@
+#! /usr/bin/env python
+
+"""\
+%prog yodafiles -c centralyoda
+
+Create an envelope yoda file.
+"""
+
+import yoda, os, sys, optparse
+
+parser = optparse.OptionParser(usage=__doc__)
+parser.add_option("-c", "--centralfile", dest="CENTRAL",
+                  default=None, help="YODA file for central value.")
+parser.add_option("-o", "--outfile", dest="OUTFILE",
+                  default="envelope.yoda", help="YODA file to store envelope output.")
+opts, args = parser.parse_args()
+
+
+def getHistos(fname, pointsonly=True):
+    """
+    Read yoda objects from file, return (for convenience)
+    (fname, [list of objects]) tuple
+    """
+    analysisobjects = yoda.readYODA(fname)
+    d={}
+    for k, v in analysisobjects.iteritems():
+        if pointsonly:
+            d[k] = v.mkScatter().points
+        else:
+            d[k] = v.mkScatter()
+    return (fname, d)
+    #return (fname, map(lambda x:x.mkScatter().points, analysisobjects))
+
+def getMinMax(scatters, obsname):
+    l_max = []
+    l_min = []
+    # Lists of points corresponding to observable obsname
+    current = [x[obsname] for x in scatters.values()]
+    # Iterate over points
+    for b in xrange(len(current[0])):
+        yvalues = [current[x][b].y for x in xrange(len(current))]
+        l_max.append(max(yvalues))
+        l_min.append(min(yvalues))
+
+    return l_min, l_max
+
+def mkEnvelope(central, list_min, list_max):
+    from yoda.core import Point2D, Scatter2D
+    # Prepare the return value object
+    env = Scatter2D(path=central.path, title=central.title)
+    # Iterate over points
+    for num, p in enumerate(central.points):
+        y = p.y
+        # Kind of clone old point but set (asymmetrical) envelopian errors
+        n = Point2D(p.x, p.y, p.xErrs, (p.y-list_min[num], list_max[num] - p.y))
+        env.addPoint(n)
+    return env
+
+def getDiff(central, other, binid):
+    return central.getBin(binid).val - other.getBin(binid).val
+
+# Require the central file to be set on CL
+if opts.CENTRAL is None:
+    sys.stderr.write("Must specify the central YODA histogram file with '-c'\n")
+    sys.exit(1)
+
+# Sanity check that files have been specified on CL
+if len(args) < 1:
+    sys.stderr.write("Must specify at least one YODA histogram file\n")
+    sys.exit(1)
+
+# The non central value files as dictionary (fname:[list of objects read from file])
+E = dict(map(getHistos, args))
+# The objects from the central file
+C = getHistos(opts.CENTRAL, pointsonly=False)[1]
+
+# Iterate over all observables
+envelopes = {}
+for k, v in C.iteritems():
+    if not type(C[k]) == yoda.core.Scatter1D:
+        l_min, l_max = getMinMax(E, k)
+        envelopes[k] = mkEnvelope(v, l_min, l_max)
+    else:
+        print "Not producing envelope for 1D scatter", k
+
+yoda.writeYODA(envelopes, opts.OUTFILE)
+print "Done. Envelopes written to %s"%opts.OUTFILE

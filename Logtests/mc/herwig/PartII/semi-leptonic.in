@@ -1,0 +1,8 @@
+cd /Herwig/MatrixElements/Matchbox
+
+set /Herwig/Particles/t:Synchronized Not_synchronized
+set /Herwig/Particles/tbar:Synchronized Not_synchronized
+do /Herwig/Particles/t:SelectDecayModes /Herwig/Particles/t/t->nu_e,e+,b; /Herwig/Particles/t/t->nu_mu,mu+,b;
+do /Herwig/Particles/tbar:SelectDecayModes /Herwig/Particles/tbar/tbar->b,bbar,cbar; /Herwig/Particles/tbar/tbar->bbar,cbar,d; /Herwig/Particles/tbar/tbar->bbar,cbar,s; /Herwig/Particles/tbar/tbar->bbar,s,ubar; /Herwig/Particles/tbar/tbar->bbar,ubar,d;
+create Herwig::BranchingRatioReweighter /Herwig/Generators/BRReweighter
+insert /Herwig/Generators/EventGenerator:EventHandler:PostHadronizationHandlers 0 /Herwig/Generators/BRReweighter
