@@ -5,8 +5,6 @@ from vector import Vec4
 from particle import Particle, CheckEvent
 from qcd import AlphaS, NC, TR, CA, CF
 import numpy as np
-import dire
-import alaric
 
 # build and run the generator
 import sys, time, optparse
@@ -52,6 +50,9 @@ from vector import Vec4, Rotation, LT
 from particle import Particle, CheckEvent
 from qcd import AlphaS, NC, TR, CA, CF
 from analysis import SimplifiedAnalysis
+
+import dire
+import alaric
 
 ecms = mn(opts.ecms)
 lam = mn(opts.asmz)/mn(opts.alphas)
