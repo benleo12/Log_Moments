@@ -1,3 +1,8 @@
+from mymath import *
+
+from vector import Vec4, Rotation, LT
+from particle import Particle, CheckEvent
+from qcd import AlphaS, NC, TR, CA, CF
 
 class Soft:
 
@@ -12,7 +17,7 @@ class Soft:
         skj = pk.SmallMLDP(pj)
         D = sij*(pk*n)+skj*(pi*n)
         if D == 0: return mn(0)
-        A = 2*sik*(pi*n)/D/2
+        A = 2*sik*(pi*n)/D
         return self.Ca*A
     def Estimate(self,z,ip):
         return self.Ca*4/(-z[1])
@@ -30,7 +35,7 @@ class Coll:
 class Cqq (Coll):
 
     def Value(self,z,pi,pj,pk,e):
-        return self.Ca*(1-z[1])*0
+        return self.Ca*(1-z[1])
     def Estimate(self,z,ip):
         return self.Ca
     def Integral(self,ip):
@@ -161,11 +166,11 @@ class Shower:
         omzp = t0/(1+t0)
         return [Kt,Q2,kap,omzp]
 
-    def UpdateWeights(self,split):
+    def UpdateWeights(self,split,evt):
         gsum, osum = mn(0), self.gs[split.id][1]
         self.gs[split.id] = [self.gs[split.id][0],mn(0)]
         for i,sf in enumerate(self.kernels[split.pid]):
-            id = self.IDParams(split.mom,event)
+            id = self.IDParams(split.mom,evt)
             g = self.alphamax/(2*m.pi)*sf.Integral(id)
             ng = 2 if ( split.col[0]!=0 and split.col[1]!=0 ) else 1
             self.gs[split.id].append([gsum+ng*g,split.id,ng,i,id])
@@ -185,16 +190,15 @@ class Shower:
         Q, a, b = mysqrt(sijt/Q2*sit/sjt), 1, self.beta
         kt = mysqrt(Q2)*mypow(rho*v,a/(a+b))*mypow(Q*omz,b/(a+b))
         y = kt**2/(-2*s[0].mom*momsum)
-        # FOR THRUST
         y = y/omz
         evt = [ p.mom for p in event ]
         moms = self.MakeKinematics(z,y,phi,s[0].mom,s[1].mom,evt)
         if moms == []: return False
         if self.amode == 0:
-            w = self.alpha(kt**2/omz,5)/self.alphamax
+            w = self.alpha(kt**2,5)/self.alphamax
         else:
             asref = self.alpha.asa(t,5)
-            if asref>0: w = self.alpha(kt**2/omz,5)/asref
+            if asref>0: w = self.alpha(kt**2,5)/asref
             else: w = 0
         w *= s[2].Value(z,moms[0],moms[1],moms[2],moms[3])/s[2].Estimate(z,s[3])
         w *= 1/(1+self.beta)
@@ -214,9 +218,9 @@ class Shower:
                 s[0].cps[c] = event[-1].id
         s[1].mom = moms[2]
         s[2] = event[-1]
-        self.UpdateWeights(s[0])
+        self.UpdateWeights(s[0],event)
         self.gs.append([self.gs[-1][0],mn(0)])
-        self.UpdateWeights(s[2])
+        self.UpdateWeights(s[2],event)
         return True
 
     def SelectSplit(self,event,rn1,rn2):
@@ -298,98 +302,10 @@ class Shower:
         self.gs = [[mn(0),mn(0)],[mn(0),mn(0)]]
         for split in event[2:]:
             self.gs.append([self.gs[-1][0],mn(0)])
-            self.UpdateWeights(split)
+            self.UpdateWeights(split,event)
         while self.t > self.ct0:
             if em >= nem: return
             self.GeneratePoint(event)
             if em == 0 and self.rt0 != 0:
                 self.ct0 = max(self.t0,self.t*self.rt0)
             em += 1
-
-
-import sys, time, optparse
-#from mpi4py import MPI
-
-parser = optparse.OptionParser()
-parser.add_option("-s","--seed",default=123456,dest="seed")
-parser.add_option("-e","--events",default=1000,dest="events")
-parser.add_option("-f","--file",default="alaric",dest="histo")
-parser.add_option("-c","--collinear",default=3,dest="coll")
-parser.add_option("-n","--nem",default=1000000,dest="nem")
-parser.add_option("-N","--nmax",default=1000000,dest="nmax")
-parser.add_option("-L","--lc",default=False,action="store_true",dest="lc")
-parser.add_option("-a","--asmz",default='0.118',dest="asmz")
-parser.add_option("-b","--beta",default='0',dest="beta")
-parser.add_option("-A","--alphas",default=0.118,dest="alphas")
-parser.add_option("-O","--order",default=1,dest="order")
-parser.add_option("-M","--min",default=1,dest="min")
-parser.add_option("-C","--cut",default=1,dest="cut")
-parser.add_option("-R","--rcut",default='0',dest="rcut")
-parser.add_option("-Q","--ecms",default='91.1876',dest="ecms")
-parser.add_option("-F","--flat",default='[]',dest="flat")
-parser.add_option("-q","--quad",default=0,action="count",dest="quad")
-parser.add_option("-K","--cluster",default=5,dest="cas")
-parser.add_option("-l","--logfile",default="",dest="logfile")
-(opts,args) = parser.parse_args()
-
-opts.histo = opts.histo.format(**vars(opts))
-if opts.logfile != "":
-    sys.stdout = open(opts.logfile, 'w')
-
-#comm = MPI.COMM_WORLD
-#if comm.Get_rank() == 0:
-#print('Running on {} ranks'.format(comm.Get_size()))
-import config
-config.quad_precision = int(opts.quad)
-from mymath import *
-#if comm.Get_rank() == 0:
-print_math_settings()
-
-from vector import Vec4, Rotation, LT
-from particle import Particle, CheckEvent
-from qcd import AlphaS, NC, TR, CA, CF
-from analysis import SimplifiedAnalysis
-
-ecms = mn(opts.ecms)
-lam = mn(opts.asmz)/mn(opts.alphas)
-t0 = mypow(mn(opts.cut)/ecms**2,lam)*ecms**2
-alphas = AlphaS(ecms,mn(opts.alphas),int(opts.order))
-#if MPI.COMM_WORLD.Get_rank() == 0:
-print("t_0 = {0}, log(Q^2/t_0) = {1}, \\alpha_s(t_0) = {2}". \
-          format(t0,mylog(ecms**2/t0),alphas(t0)))
-shower = Shower(alphas,t0,int(opts.coll),mn(opts.beta),
-                mn(opts.rcut),eval(opts.flat),int(opts.nmax),opts.lc)
-jetrat = SimplifiedAnalysis(-0.0033)
-
-#rng.seed((comm.Get_rank()+1)*int(opts.seed))
-rng.seed(int(opts.seed))
-#start = time.perf_counter()
-nevt, nout = int(float(opts.events)), 1
-for i in range(1,nevt+1):
-    event, weight = ( [
-            Particle(-11,-Vec4(ecms/mn(2),mn(0),mn(0),ecms/mn(2)),[0,0],0),
-            Particle(11,-Vec4(ecms/mn(2),mn(0),mn(0),-ecms/mn(2)),[0,0],1),
-            Particle(1,Vec4(ecms/mn(2),mn(0),mn(0),ecms/mn(2)),[1,0],2,[3,0]),
-            Particle(-1,Vec4(ecms/mn(2),mn(0),mn(0),-ecms/mn(2)),[0,1],3,[0,2])
-        ], 1 )
-    shower.Run(event,int(opts.nem))
-    check = CheckEvent(event)
-    if len(check): print('Error:',check[0],check[1])
-    if i % nout == 0: #and comm.Get_rank() == 0:
-        if opts.logfile != "":
-            print('Event {n}\n'.format(n=i))
-        else:
-            sys.stdout.write('Event {n}\r'.format(n=i))
-        sys.stdout.flush()
-        if i/nout == 10: nout *= 10
-    jetrat.Analyze(event,weight*shower.weight)
-thrust_values = jetrat.Finalize()
-
-# save w csv
-
-import csv
-# Save thrust values to a CSV file
-with open('thrust_values.csv', 'wb') as csvfile:  # Note 'wb' for Python 2.7
-    writer = csv.writer(csvfile)
-    for value in thrust_values:
-        writer.writerow([value])
