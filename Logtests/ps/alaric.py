@@ -190,15 +190,15 @@ class Shower:
         Q, a, b = mysqrt(sijt/Q2*sit/sjt), 1, self.beta
         kt = mysqrt(Q2)*mypow(rho*v,a/(a+b))*mypow(Q*omz,b/(a+b))
         y = kt**2/(-2*s[0].mom*momsum)
-        y = y#/omz
+        y = y/omz
         evt = [ p.mom for p in event ]
         moms = self.MakeKinematics(z,y,phi,s[0].mom,s[1].mom,evt)
         if moms == []: return False
         if self.amode == 0:
-            w = self.alpha(kt**2*omz,5)/self.alphamax
+            w = self.alpha(kt**2,5)/self.alphamax
         else:
             asref = self.alpha.asa(t,5)
-            if asref>0: w = self.alpha(kt**2*omz,5)/asref
+            if asref>0: w = self.alpha(kt**2,5)/asref
             else: w = 0
         w *= s[2].Value(z,moms[0],moms[1],moms[2],moms[3])/s[2].Estimate(z,s[3])
         w *= 1/(1+self.beta)
