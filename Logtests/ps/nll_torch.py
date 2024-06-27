@@ -22,7 +22,7 @@ class NLL:
         return 1./(2.*m.pi*b0*l*b)*\
             ((a-2.*l)*m.log(1.-2.*l/a)
              -(a+b-2.*l)*m.log(1.-2.*l/(a+b)))
-        
+
     def r2(self,as0,b0,b1,K,a,b,L):
         l = as0*b0*L
         return 1./b*\
@@ -52,7 +52,7 @@ class NLL:
         A1 = 2.*CF
         return A1*\
             L*(self.r1(self.as0,self.b0,self.a,self.b,L))
-    
+
     def R_SL(self,v):
         L = m.log(1./v)
         Bl = -3./4.
@@ -67,7 +67,7 @@ class NLL:
     def rpp(self,as0,b0,a,b,L):
         l = as0*b0*L
         return (as0*2/m.pi)*1./((a-2*l)*(a+b-2*l))
-    
+
     def rnnllp(self,as0,b0,b1,a,b,L,nf):
         l = as0*b0*L
         A1 = 2.*CF*(2*as0/m.pi)
@@ -116,19 +116,19 @@ class NLL:
         self.K = (67./18.-pow(m.pi,2)/6.)*CA-10./9.*TR*5
         #self.v = pow(10.,-2.*r.random())
         #return 2. * m.exp(-self.R(self.v))*self.F(self.v)
-            
+
 # build and run the generator
 
-import sys, optparse, matrix, shapes
+#import sys, optparse, matrix, shapes
 
-parser = optparse.OptionParser()
-parser.add_option("-e","--events",default=1000000,dest="events")
-parser.add_option("-f","--file",default="nll",dest="histo")
-parser.add_option("-a","--a_coefficient",default=1,dest="a")
-parser.add_option("-b","--b_coefficient",default=1,dest="b")
-(opts,args) = parser.parse_args()
+#parser = optparse.OptionParser()
+#parser.add_option("-e","--events",default=1000000,dest="events")
+#parser.add_option("-f","--file",default="nll",dest="histo")
+#parser.add_option("-a","--a_coefficient",default=1,dest="a")
+#parser.add_option("-b","--b_coefficient",default=1,dest="b")
+#(opts,args) = parser.parse_args()
 
-alphas = [ AlphaS(91.2,0.118,0), AlphaS(91.2,0.118,1) ]
+#alphas = [ AlphaS(91.2,0.118,0), AlphaS(91.2,0.118,1) ]
 #hardxs = matrix.eetojj()
 #shower = NLL(alphas,a=float(opts.a),b=float(opts.b))
 #shapes = shapes.ShapeAnalysis()
@@ -140,4 +140,3 @@ alphas = [ AlphaS(91.2,0.118,0), AlphaS(91.2,0.118,1) ]
 #    sys.stdout.flush()
 #    shapes.FillHistos(shower.v,weight,[w])
 #shapes.Finalize(opts.histo)
-

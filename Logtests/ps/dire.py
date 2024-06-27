@@ -13,7 +13,7 @@ class Kernel:
 class Soft (Kernel):
 
     def Value(self,z,k2):
-        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2)-2)
+        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2)-2)/2
     def Estimate(self,z,k02):
         return self.Ca*2*(-z[1])/(z[1]*z[1]+k02)
     def Integral(self,k02):
@@ -24,7 +24,7 @@ class Soft (Kernel):
 class Cqq (Kernel):
 
     def Value(self,z,k2):
-        return self.Ca*(1-z[1])
+        return self.Ca*(1-z[1])*0
     def Estimate(self,z,k02):
         return self.Ca
     def Integral(self,k02):
@@ -35,7 +35,7 @@ class Cqq (Kernel):
 class Cgg (Kernel):
 
     def Value(self,z,k2):
-        return self.Ca*z[1]*(1-z[1])
+        return self.Ca*z[1]*(1-z[1])*0
     def Estimate(self,z,k02):
         return self.Ca
     def Integral(self,k02):
@@ -46,7 +46,7 @@ class Cgg (Kernel):
 class Cgq (Kernel):
 
     def Value(self,z,k2):
-        return TR/2*(1-2*z[1]*(1-z[1]))
+        return TR/2*(1-2*z[1]*(1-z[1]))*0
     def Estimate(self,z,k02):
         return TR/2
     def Integral(self,k02):

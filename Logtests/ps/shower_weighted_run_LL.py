@@ -97,9 +97,9 @@ thrust_values = jetrat.Finalize()
 import matplotlib.pyplot as plt
 from scipy.integrate import quad
 # Integration range
-min_tau = 10**-24#10
-max_tau = 0.999#0.1
-#coeff = 2 * alpha_s / (3 * np.pi)
+min_tau = 10**-35#10
+max_tau = 0.1#0.1
+
 
 alphas = [ AlphaS(ecms,mn(opts.alphas),0),
            AlphaS(ecms,mn(opts.alphas),int(opts.order)) ]
@@ -156,7 +156,7 @@ def wNLL(tau_values):
 # Numerical integration
 CLL0, _ = quad(lambda t: wLL(t), min_tau, max_tau)
 CLL1, _ = quad(lambda t: wLL(t) * np.log(t), min_tau, max_tau)
-CLL2, _ = quad(lambda t: wLL(t) * np.log(t)**2, min_tau, max_tau)
+CLL2, _ = quad(lambda t: wLL(t)  * (analytics.R_L(t)), min_tau, max_tau)
 
 CNLL0, _ = quad(lambda t: wNLL(t), min_tau, max_tau)
 CNLL1, _ = quad(lambda t: wNLL(t) * ((analytics.R_SL(t)-analytics.logF(t))), min_tau, max_tau)
@@ -173,7 +173,9 @@ lambda_0 = 0
 lambda_2 = 0.0
 
 lambda_1 = 0.0
-#lambda_2 = 0.573868453502655
+lambda_2 = 0.068702504
+
+
 
 def weight(tau_i):
 #return  np.exp(lambda_0 - lambda_1 * np.log(t) - lambda_2 * np.log(t)**2)
@@ -184,7 +186,7 @@ def weight(tau_i):
     logFt = analytics.logF(tau_i)
     FpFt = analytics.FpF(tau_i)
     RNNLLpt = analytics.RNNLLp(tau_i)
-    part = (CNLL2)/((CNLL2-lambda_2))
+    part = (CLL2)/((CLL2-lambda_2))
     expon = np.exp(-lambda_2*analytics.R_L(tau_i))
     return expon*part
 
@@ -201,8 +203,6 @@ ax = fig.add_subplot(1,1,1)
 ax.set_yscale('log')
 ax.plot(np.log10(tau_values), np.log(10)*tau_values*pLL_values, label='LL Theoretical Thrust Distribution', color='blue')
 ax.plot(np.log10(tau_values), np.log(10)*tau_values*pNLL_values, label='NLL Theoretical Thrust Distribution', color='green')
-#ax.set_yscale('log')
-#ax.set_xscale('log')
 # Overlay with actual thrust distribution
 # Assuming 'thrust_values' is a list of thrust values from the previous operations
 linbins = np.linspace(np.log10(min_tau),0.0,num=100)
@@ -213,7 +213,7 @@ weights = [weight(tau) for tau in thrust_values]
 
 # Weighted histogram
 print("log10vals=",np.log10(thrust_values))
-zeros=np.ones(len(thrust_values))*10**-24
+zeros=np.ones(len(thrust_values))*min_tau
 
 plt.hist(np.log10(np.maximum(thrust_values,zeros)), bins=linbins, weights=weights, alpha=0.5, density=True, label='Weighted Simulated Distribution', color='black')
 #    return coeff * ((-4 * np.log(t) + 3) / t) * np.exp(- coeff * (2 * np.log(t)**2 - 3 * np.log(t)))

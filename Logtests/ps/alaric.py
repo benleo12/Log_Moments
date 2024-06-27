@@ -17,7 +17,7 @@ class Soft:
         skj = pk.SmallMLDP(pj)
         D = sij*(pk*n)+skj*(pi*n)
         if D == 0: return mn(0)
-        A = 2*sik*(pi*n)/D
+        A = 2*sik*(pi*n)/D/2
         return self.Ca*A
     def Estimate(self,z,ip):
         return self.Ca*4/(-z[1])
@@ -35,7 +35,7 @@ class Coll:
 class Cqq (Coll):
 
     def Value(self,z,pi,pj,pk,e):
-        return self.Ca*(1-z[1])
+        return self.Ca*(1-z[1])*0
     def Estimate(self,z,ip):
         return self.Ca
     def Integral(self,ip):
@@ -46,7 +46,7 @@ class Cqq (Coll):
 class Cgg (Coll):
 
     def Value(self,z,pi,pj,pk,e):
-        return self.Ca*z[1]*(1-z[1])
+        return self.Ca*z[1]*(1-z[1])*0
     def Estimate(self,z,ip):
         return self.Ca
     def Integral(self,ip):
@@ -57,7 +57,7 @@ class Cgg (Coll):
 class Cgq (Coll):
 
     def Value(self,z,pi,pj,pk,e):
-        return TR/2*(1-2*z[1]*(1-z[1]))
+        return TR/2*(1-2*z[1]*(1-z[1]))*0
     def Estimate(self,z,ip):
         return TR/2
     def Integral(self,ip):

@@ -1,9 +1,44 @@
+import argparse
+print("Script started")
+# other imports and code follow
+
+
+parser = argparse.ArgumentParser(description='Process events and analyze thrust.')
+parser.add_argument('--e', type=int, default=20000, help='Number of samples to process')
+parser.add_argument('--n_step', type=int, default=100, help='Number of steps in the process')
+parser.add_argument('--step_frac', type=float, default=1.1, help='Fractional step increase per iteration')
+parser.add_argument('--samp_fac', type=float, default=10, help='Sample factor for scaling')
+parser.add_argument('--asif', type=float, default=0.02, help='alphas limit')
+parser.add_argument('--min_t', type=float, default=1e-8, help='alphas limit')
+# Debugging: Verify this line is executed
+print("Debug: Adding arguments complete")
+import sys
+print(sys.argv)
+
+# Parse arguments
+args = parser.parse_args()
+n_samp = args.e
+n_step = args.n_step
+step_frac = args.step_frac
+samp_fac = args.samp_fac
+asif = args.asif
+min_tau = args.min_t
+
+
+# Define a function to save parameters to a file
+def save_params(lambda_2, asif, filename="params.txt"):
+    with open(filename, 'w') as f:
+        f.write(f"lambda_2: {lambda_2}\n")
+        f.write(f"asif: {asif}\n")
+
+print("Script started")
+
+
 import torch
 import torch.optim as optim
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.special import erfc
-import argparse
 import subprocess
 import csv
 import time
@@ -12,28 +47,17 @@ import nll_torch
 from qcd import AlphaS, NC, TR, CA, CF
 from scipy.integrate import quad
 
-parser = argparse.ArgumentParser(description='Process events and analyze thrust.')
-parser.add_argument('--e', type=int, default=10000, help='Number of samples to process')
-parser.add_argument('--n_step', type=int, default=100, help='Number of samples to process')
-parser.add_argument('--step_frac', type=float, default=1.1, help='Number of samples to process')
-parser.add_argument('--samp_fac', type=float, default=10, help='Number of samples to process')
-# Parse arguments
-args = parser.parse_args()
 
-n_samp = args.e
-n_step = args.n_step
-step_frac = args.step_frac
-samp_fac = args.samp_fac
 
 # Assuming alpha_s is a known constant
 alpha_s = 0.118
 
 # Integration range
-min_tau = 10**-24
-max_tau = 0.9999#0.9999
+#min_tau = 10**-10
+max_tau = 0.999999
 coeff = 2 * alpha_s / (3 * np.pi)
 
-alphas = [ AlphaS(91.1876,0.01,0), AlphaS(91.1876,0.01,0) ]
+alphas = [ AlphaS(91.1876,asif,0), AlphaS(91.1876,asif,0) ]
 analytics = nll_torch.NLL(alphas,a=1,b=1,t=91.1876**2)
 
 
@@ -97,7 +121,7 @@ print("CLL=",CLL)
 def run_pypy_script(pypy_script_path):
     """Runs the PyPy script with specified flags that generates the CSV file."""
     # Define the additional flags as a list
-    flags = ['-e',str(n_samp), '-A','0.01', '-n','1', '-O','0']
+    flags = ['-e',str(n_samp), '-A',str(asif), '-n','1', '-O','0','-b','1']
 
     try:
         # Include the additional flags in the subprocess call
@@ -155,7 +179,7 @@ def integral_equation_2_direct(lambda_0,lambda_1, lambda_2, tau_i, n_samp):
 # Initialize the Lagrange multipliers
 lambda_0 = torch.tensor([0.2819207*0], requires_grad=True)
 lambda_1 = torch.tensor([0.3137269*0], requires_grad=True)
-lambda_2 = torch.tensor([0.4], requires_grad=True)
+lambda_2 = torch.tensor([0.5], requires_grad=True)
 
 # Define the optimizer
 optimizer = optim.Adam([lambda_2], lr=0.01)
@@ -166,11 +190,15 @@ lambda_1_values = []
 lambda_2_values = []
 loss_values = []
 n_samp_values = []
+min_loss = 1e-4
+no_decrease_counter = 0
+max_no_decrease_steps = 10
+
 for step in range(1000000):
 
     print(f"Running optimization step {step+1}")
-    pypy_script_path = os.path.expanduser('~/Dropbox/LogMoments/tutorials/ps/alaric.py')
-    thrust_path = os.path.expanduser('~/Dropbox/LogMoments/tutorials/ps/thrust_values.csv')
+    pypy_script_path = os.path.expanduser('~/Dropbox/LogMoments/Logtests/ps/dire.py')
+    thrust_path = os.path.expanduser('~/Dropbox/LogMoments/Logtests/ps/thrust_values.csv')
 
     if run_pypy_script(pypy_script_path):
         if os.path.exists(thrust_path):
@@ -209,40 +237,46 @@ for step in range(1000000):
     if n_step <= 5:
         break
 
+    # Save parameters if loss stops decreasing
+    if step > 0 and loss.item() < min_loss:
+        save_params(lambda_2.item(), asif)
+        break
 
 
-# Plotting outside the loop
 
-# Assuming n_samp_values and lambda_1_values are defined
-
-plt.figure(figsize=(10, 6))
-plt.plot(n_samp_values, lambda_1_values, 'o-', color='tab:red')  # Plotting with markers and lines
-plt.xscale('log')  # Applying log scale to the x-axis
-plt.xlabel(r'$n_{samp}$', fontsize=14)
-plt.ylabel(r'$\lambda_1$', color='tab:red', fontsize=14)
-plt.title('Log moment progression', fontsize=16)
-plt.grid(True, which="both", ls="--")  # Adding grid lines for readability
-plt.show()
-
-plt.figure(figsize=(10, 6))
-plt.plot(n_samp_values, lambda_2_values, 'o-', color='tab:red')  # Plotting with markers and lines
-plt.xscale('log')  # Applying log scale to the x-axis
-plt.xlabel(r'$n_{samp}$', fontsize=14)
-plt.ylabel(r'$\lambda_2$', color='tab:red', fontsize=14)
-plt.title('Log moment progression', fontsize=16)
-plt.grid(True, which="both", ls="--")  # Adding grid lines for readability
-plt.show()
-
-# Log-log plot for loss
-plt.figure(figsize=(10, 6))
-plt.loglog(n_samp_values, loss_values, color='tab:blue')
-plt.xlabel(r'$n_{samp}$', fontsize=14)
-plt.ylabel('Loss', color='tab:blue', fontsize=14)
-plt.title('Loss progression', fontsize=16)
-plt.tick_params(axis='y', labelcolor='tab:blue')
-plt.grid(False, which="both", ls="--")  # Adding grid lines for readability
-plt.tight_layout()
-plt.show()
+#
+# # Plotting outside the loop
+#
+# # Assuming n_samp_values and lambda_1_values are defined
+#
+# plt.figure(figsize=(10, 6))
+# plt.plot(n_samp_values, lambda_1_values, 'o-', color='tab:red')  # Plotting with markers and lines
+# plt.xscale('log')  # Applying log scale to the x-axis
+# plt.xlabel(r'$n_{samp}$', fontsize=14)
+# plt.ylabel(r'$\lambda_1$', color='tab:red', fontsize=14)
+# plt.title('Log moment progression', fontsize=16)
+# plt.grid(True, which="both", ls="--")  # Adding grid lines for readability
+# plt.show()
+#
+# plt.figure(figsize=(10, 6))
+# plt.plot(n_samp_values, lambda_2_values, 'o-', color='tab:red')  # Plotting with markers and lines
+# plt.xscale('log')  # Applying log scale to the x-axis
+# plt.xlabel(r'$n_{samp}$', fontsize=14)
+# plt.ylabel(r'$\lambda_2$', color='tab:red', fontsize=14)
+# plt.title('Log moment progression', fontsize=16)
+# plt.grid(True, which="both", ls="--")  # Adding grid lines for readability
+# plt.show()
+#
+# # Log-log plot for loss
+# plt.figure(figsize=(10, 6))
+# plt.loglog(n_samp_values, loss_values, color='tab:blue')
+# plt.xlabel(r'$n_{samp}$', fontsize=14)
+# plt.ylabel('Loss', color='tab:blue', fontsize=14)
+# plt.title('Loss progression', fontsize=16)
+# plt.tick_params(axis='y', labelcolor='tab:blue')
+# plt.grid(False, which="both", ls="--")  # Adding grid lines for readability
+# plt.tight_layout()
+# plt.show()
 
 
 # Print final values of the Lagrange multipliers
