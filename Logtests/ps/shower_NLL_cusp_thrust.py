@@ -9,7 +9,7 @@ parser.add_argument('--n_step', type=int, default=100, help='Number of steps in 
 parser.add_argument('--step_frac', type=float, default=1.1, help='Fractional step increase per iteration')
 parser.add_argument('--samp_fac', type=float, default=10, help='Sample factor for scaling')
 parser.add_argument('--asif', type=float, default=0.02, help='alphas limit')
-parser.add_argument('--min_t', type=float, default=1e-8, help='alphas limit')
+parser.add_argument('--min_t', type=float, default=1e-15, help='alphas limit')
 # Debugging: Verify this line is executed
 print("Debug: Adding arguments complete")
 import sys
@@ -54,17 +54,17 @@ alpha_s = 0.118
 
 # Integration range
 #min_tau = 10**-10
-max_tau = 0.1
+max_tau = 0.001
 coeff = 2 * alpha_s / (3 * np.pi)
 
-alphas = [ AlphaS(91.1876,asif,0), AlphaS(91.1876,asif,0) ]
+alphas = [ AlphaS(91.1876,asif,0), AlphaS(91.1876,asif,1) ]
 analytics = nll_torch.NLL(alphas,a=1,b=1,t=91.1876**2)
 
 
 # Define wLL and wNLL functions
 def wLL(tau):
-     partC = (analytics.Rp(tau))/tau
-     exponC = np.exp(-analytics.R_L(tau))
+     partC = (analytics.Rp(tau)+analytics.RNLLcp(tau))/tau
+     exponC = np.exp(-analytics.R_L(tau)-analytics.R_NLLc(tau))
      return partC*exponC
 
 def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=10000000):
@@ -92,36 +92,22 @@ def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=10000000):
     return integral
 
 
-def torch_quad_old(func, a, b, func_mul=None, func_mul2=None, num_steps=100000):
-    x = torch.logspace(torch.log10(a), torch.log10(b), steps=num_steps, dtype=torch.float64)
-    dx = np.log(10)*(torch.log10(b) - torch.log10(a))*x / num_steps
-    y = func(x)
-    #print("y before applying func_mul:", y)
-    if func_mul is not None:
-        y = y*func_mul(x)
-    if func_mul2 is not None:
-        y = y*func_mul2(x)
-    #print("y after applying func_mul:", y)
-    print("YDX:",torch.sum(y * dx))
-    return torch.sum(y * dx)
-
-
-
 min_tau = torch.tensor(min_tau)
 max_tau = torch.tensor(max_tau)
 
 CLL0 = torch_quad(wLL, min_tau, max_tau)
 CLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_L)
+CNLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_NLLc)
 #CLL = torch_quad(wLL, min_tau, max_tau, func_mul=torch.log)#/CLL0
 
 print("CLL0=",CLL0)
 print("CLL=",CLL)
-
+print("CNLL=",CNLL)
 
 def run_pypy_script(pypy_script_path):
     """Runs the PyPy script with specified flags that generates the CSV file."""
     # Define the additional flags as a list
-    flags = ['-e',str(n_samp), '-A',str(asif), '-n','1', '-O','0','-b','1']
+    flags = ['-e',str(n_samp), '-A',str(asif), '-n','1', '-O','1','-b','1']
 
     try:
         # Include the additional flags in the subprocess call
@@ -149,36 +135,33 @@ def mc_integration(integrand, tau_values, n_samp):
     return integral
 
 # Define the integral equations using the dataset directly
-def integral_equation_1_direct(lambda_0, lambda_1, lambda_2, tau_i, n_samp):
+def integral_equation_1_direct(lambda_0,lambda_1, lambda_2, tau_i, n_samp):
     Rpt = analytics.Rp(tau_i)
     logFt = analytics.logF(tau_i)
     FpFt = analytics.FpF(tau_i)
-    RNNLLpt = analytics.RNNLLp(tau_i)
-    part = (CLL*Rpt)/((CLL-lambda_2)*Rpt)
-    expon = torch.exp( -  lambda_2*analytics.R_L(tau_i))
-    moment = 1
+    RNLLpt = analytics.RNLLcp(tau_i)
+    part = 1#(CLL*Rpt + CNLL*(RNLLpt))/((CLL-lambda_1)*Rpt+(CNLL-lambda_2)*(RNLLpt))
+    expon = torch.exp(-lambda_1*analytics.R_L(tau_i)-lambda_2*analytics.R_NLLc(tau_i))
+    moment = analytics.R_L(tau_i)
     integral = mc_integration(expon*part*moment, tau_i, n_samp)/mc_integration(expon*part, tau_i, n_samp)
-    integral_0 = mc_integration(torch.ones(len(tau_i)), tau_i, n_samp)
-    print("check unitary:",integral)
-    print("check unitary 1:",integral_0)
-    return integral - CLL0
+    return integral - CLL
+
 
 def integral_equation_2_direct(lambda_0,lambda_1, lambda_2, tau_i, n_samp):
     Rpt = analytics.Rp(tau_i)
     logFt = analytics.logF(tau_i)
     FpFt = analytics.FpF(tau_i)
-    RNNLLpt = analytics.RNNLLp(tau_i)
-    part = (CLL)/((CLL-lambda_2))
-    expon = torch.exp( -  lambda_2*analytics.R_L(tau_i))
-    moment = analytics.R_L(tau_i)
-    #moment = torch.log(tau_i)**2
+    RNLLpt = analytics.RNLLcp(tau_i)
+    part = 1#(CLL*Rpt + CNLL*(RNLLpt))/((CLL-lambda_1)*Rpt+(CNLL-lambda_2)*(RNLLpt))
+    expon = torch.exp(-lambda_1*analytics.R_L(tau_i)-0*analytics.R_NLLc(tau_i))
+    moment = analytics.R_NLLc(tau_i)
     integral = mc_integration(expon*part*moment, tau_i, n_samp)/mc_integration(expon*part, tau_i, n_samp)
-    return integral - CLL
+    return integral - CNLL
 
 
 # Initialize the Lagrange multipliers
 lambda_0 = torch.tensor([0.2819207*0], requires_grad=True)
-lambda_1 = torch.tensor([0.3137269*0], requires_grad=True)
+lambda_1 = torch.tensor([0.0], requires_grad=True)
 lambda_2 = torch.tensor([0.5], requires_grad=True)
 
 # Define the optimizer
@@ -190,27 +173,31 @@ lambda_1_values = []
 lambda_2_values = []
 loss_values = []
 n_samp_values = []
-min_loss = 1e-4
+min_loss = 1e-5
 no_decrease_counter = 0
 max_no_decrease_steps = 10
+
+# Generate data once
+pypy_script_path = os.path.expanduser('~/Dropbox/LogMoments/Logtests/ps/dire.py')
+thrust_path = os.path.expanduser('~/Dropbox/LogMoments/Logtests/ps/thrust_values.csv')
+
+if run_pypy_script(pypy_script_path):
+    if os.path.exists(thrust_path):
+        tau_i = read_csv_to_torch(thrust_path)
+    else:
+        print(f"CSV file not found: {thrust_path}")
+        raise RuntimeError("Data generation failed. Exiting.")
+else:
+    print("PyPy script execution failed.")
+    raise RuntimeError("Data generation failed. Exiting.")
+
+filtered_tau_0 = tau_i[(tau_i <= min_tau)]
+filtered_tau_i = tau_i[(tau_i >= min_tau) & (tau_i <= max_tau)]
+print("zero taus = ", len(filtered_tau_0))
 
 for step in range(1000000):
 
     print(f"Running optimization step {step+1}")
-    pypy_script_path = os.path.expanduser('~/Dropbox/LogMoments/Logtests/ps/dire.py')
-    thrust_path = os.path.expanduser('~/Dropbox/LogMoments/Logtests/ps/thrust_values.csv')
-
-    if run_pypy_script(pypy_script_path):
-        if os.path.exists(thrust_path):
-            tau_i = read_csv_to_torch(thrust_path)
-        #    print("TAUS = ", tau_i)
-        else:
-            print(f"CSV file not found: {thrust_path}")
-    else:
-        print("PyPy script execution failed.")
-        break  # Stop the loop if PyPy script fails to run
-    filtered_tau_0 = tau_i[(tau_i <= min_tau)]
-    print("zero taus = ",len(filtered_tau_0))
     filtered_tau_i = tau_i[(tau_i >= min_tau) & (tau_i <= max_tau)]
     optimizer.zero_grad()
     loss_1 = torch.abs(integral_equation_1_direct(lambda_0, lambda_1, lambda_2, filtered_tau_i, n_samp))

@@ -4,26 +4,30 @@ from vector import Vec4, Rotation, LT
 from particle import Particle, CheckEvent
 from qcd import AlphaS, NC, TR, CA, CF
 
+K = (67./18.-pow(m.pi,2)/6.)*CA-10./9.*TR*5
+K=0
 class Kernel:
 
-    def __init__(self,flavs,Ca):
+    def __init__(self,flavs,Ca,alphamax,alpha):
         self.flavs = flavs
         self.Ca = Ca
+        self.alphamax=alphamax
+        self.alpha=alpha
 
 class Soft (Kernel):
 
-    def Value(self,z,k2):
-        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2)-2)/2
+    def Value(self,z,k2,t):
+        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2)-2)*(1+self.alpha(t)/(2*m.pi)*K)
     def Estimate(self,z,k02):
-        return self.Ca*2*(-z[1])/(z[1]*z[1]+k02)
+        return self.Ca*2*(-z[1])/(z[1]*z[1]+k02)*(1+self.alphamax/(2*m.pi)*K)
     def Integral(self,k02):
-        return self.Ca*mylog(1+1/k02)
+        return self.Ca*mylog(1+1/k02)*(1+self.alphamax/(2*m.pi)*K)
     def GenerateZ(self,k02):
         return [mn(1),-mysqrt(k02*(mypow(1+1/k02,mn(rng.random()))-1))]
 
 class Cqq (Kernel):
 
-    def Value(self,z,k2):
+    def Value(self,z,k2,t):
         return self.Ca*(1-z[1])*0
     def Estimate(self,z,k02):
         return self.Ca
@@ -34,7 +38,7 @@ class Cqq (Kernel):
 
 class Cgg (Kernel):
 
-    def Value(self,z,k2):
+    def Value(self,z,k2,t):
         return self.Ca*z[1]*(1-z[1])*0
     def Estimate(self,z,k02):
         return self.Ca
@@ -45,7 +49,7 @@ class Cgg (Kernel):
 
 class Cgq (Kernel):
 
-    def Value(self,z,k2):
+    def Value(self,z,k2,t):
         return TR/2*(1-2*z[1]*(1-z[1]))*0
     def Estimate(self,z,k02):
         return TR/2
@@ -76,14 +80,14 @@ class Shower:
             self.alphamax = (2*m.pi)/self.alpha.beta0(5)
         self.kernels = {}
         for fl in [-5,-4,-3,-2,-1,1,2,3,4,5]:
-            self.kernels[fl] = [ Soft([fl,fl,21],CA/2 if lc else CF)  ]
-        self.kernels[21] = [ Soft([21,21,21],CA/2) ]
+            self.kernels[fl] = [ Soft([fl,fl,21],CA/2 if lc else CF,self.alphamax,self.alpha) ]
+        self.kernels[21] = [ Soft([21,21,21],CA/2,self.alphamax,self.alpha) ]
         if coll & 1:
             for fl in [-5,-4,-3,-2,-1,1,2,3,4,5]:
-                self.kernels[fl].append( Cqq([fl,fl,21],CA/2 if lc else CF) )
+                self.kernels[fl].append( Cqq([fl,fl,21],CA/2 if lc else CF,self.alphamax,self.alpha) )
         if coll & 2:
-            self.kernels[21].append( Cgg([21,21,21],CA/2) )
-            self.kernels[21].append( Cgq([21,0,0],0) )
+            self.kernels[21].append( Cgg([21,21,21],CA/2,self.alphamax,self.alpha) )
+            self.kernels[21].append( Cgq([21,0,0],0,self.alphamax,self.alpha) )
         self.Ca = CA/2 if lc else CF
         self.Bl = -3./4. if coll&1 else -1.
 
@@ -177,7 +181,7 @@ class Shower:
             asref = self.alpha.asa(t,5)
             if asref>0: w = self.alpha(kt**2,5)/asref
             else: w = 0
-        w *= s[2].Value(z,kt**2/s[3])/s[2].Estimate(z,self.ct0/s[3])
+        w *= s[2].Value(z,kt**2/s[3],t)/s[2].Estimate(z,self.ct0/s[3])
         w *= 1/(1+self.beta)
         if w <= rng.random(): return False
         phi = 2*m.pi*rng.random()
@@ -264,7 +268,7 @@ class Shower:
             self.t = t
             if self.t > self.ct0:
                 if self.GenerateZ(event,momsum,s,t): return
-    
+
     def Run(self,event,nem):
         em = 0
         self.c = 2

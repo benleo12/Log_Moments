@@ -54,7 +54,7 @@ alpha_s = 0.118
 
 # Integration range
 #min_tau = 10**-10
-max_tau = 0.999999
+max_tau = 0.001
 coeff = 2 * alpha_s / (3 * np.pi)
 
 alphas = [ AlphaS(91.1876,asif,0), AlphaS(91.1876,asif,0) ]
@@ -190,27 +190,32 @@ lambda_1_values = []
 lambda_2_values = []
 loss_values = []
 n_samp_values = []
-min_loss = 1e-4
+min_loss = 1e-5
 no_decrease_counter = 0
 max_no_decrease_steps = 10
+
+# Generate data once
+pypy_script_path = os.path.expanduser('~/Dropbox/LogMoments/Logtests/ps/dire.py')
+thrust_path = os.path.expanduser('~/Dropbox/LogMoments/Logtests/ps/thrust_values.csv')
+
+if run_pypy_script(pypy_script_path):
+    if os.path.exists(thrust_path):
+        tau_i = read_csv_to_torch(thrust_path)
+    else:
+        print(f"CSV file not found: {thrust_path}")
+        raise RuntimeError("Data generation failed. Exiting.")
+else:
+    print("PyPy script execution failed.")
+    raise RuntimeError("Data generation failed. Exiting.")
+
+filtered_tau_0 = tau_i[(tau_i <= min_tau)]
+filtered_tau_i = tau_i[(tau_i >= min_tau) & (tau_i <= max_tau)]
+print("zero taus = ", len(filtered_tau_0))
 
 for step in range(1000000):
 
     print(f"Running optimization step {step+1}")
-    pypy_script_path = os.path.expanduser('~/Dropbox/LogMoments/Logtests/ps/dire.py')
-    thrust_path = os.path.expanduser('~/Dropbox/LogMoments/Logtests/ps/thrust_values.csv')
-
-    if run_pypy_script(pypy_script_path):
-        if os.path.exists(thrust_path):
-            tau_i = read_csv_to_torch(thrust_path)
-        #    print("TAUS = ", tau_i)
-        else:
-            print(f"CSV file not found: {thrust_path}")
-    else:
-        print("PyPy script execution failed.")
-        break  # Stop the loop if PyPy script fails to run
-    filtered_tau_0 = tau_i[(tau_i <= min_tau)]
-    print("zero taus = ",len(filtered_tau_0))
+    
     filtered_tau_i = tau_i[(tau_i >= min_tau) & (tau_i <= max_tau)]
     optimizer.zero_grad()
     loss_1 = torch.abs(integral_equation_1_direct(lambda_0, lambda_1, lambda_2, filtered_tau_i, n_samp))

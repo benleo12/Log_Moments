@@ -14,7 +14,7 @@ class NLL:
         self.as0 = self.alpha[0](t)
         self.b0 = self.alpha[0].beta0(5)/(2.*m.pi)
         self.b1 = self.alpha[1].beta1(5)/pow(2.*m.pi,2)
-        self.K = (67./18.-pow(m.pi,2)/6.)*CA-10./9.*TR*5
+        self.K = 0#(67./18.-pow(m.pi,2)/6.)*CA-10./9.*TR*5
         self.nf = 5
 
     def r1(self,as0,b0,a,b,L):
@@ -61,6 +61,12 @@ class NLL:
             (self.r2(self.as0,self.b0,self.b1,self.K,self.a,self.b,L)+\
              Bl*self.T(self.as0,self.b0,L/(self.a+self.b)))
 
+    def R_NLLc(self,v):
+        L = m.log(1./v)
+        A1 = 2.*CF
+        return A1*\
+            (self.r2(self.as0,self.b0,self.b1,self.K,self.a,self.b,L))
+
     def rp(self,as0,b0,a,b,L):
         return 1./b*(self.T(as0,b0,L/a)-self.T(as0,b0,L/(a+b)))
 
@@ -76,6 +82,15 @@ class NLL:
         Bp = Bl*1/(a+b-2*l)
         return (-A1*b1*(a*(a+b-2*l)*m.log(1.-2*l/a)-(a+b)*(a-2*l)*m.log(1-2*l/(a+b))+2*b*l) /( 2*b*b0**2*(a-2*l)*(a+b-2*l) ) + A2*l/(2*m.pi*b0)/(a-2*l)/(a+b-2*l)) + A1*Bp
 
+    def rnllcp(self,as0,b0,b1,a,b,L,nf):
+        l = as0*b0*L
+        A1 = 2.*CF*(2*as0/m.pi)
+        A2 = CF*(CA*(67/9-m.pi**2/3)-10/9*nf)*(2*as0/m.pi)
+        Bl = 0
+        Bp = Bl*1/(a+b-2*l)
+        return (-A1*b1*(a*(a+b-2*l)*m.log(1.-2*l/a)-(a+b)*(a-2*l)*m.log(1-2*l/(a+b))+2*b*l) /( 2*b*b0**2*(a-2*l)*(a+b-2*l) ) + A2*l/(2*m.pi*b0)/(a-2*l)/(a+b-2*l)) + A1*Bp
+
+
     def Rp(self,v):
         L = m.log(1./v)
         return 2.*CF*self.rp(self.as0,self.b0,self.a,self.b,L)
@@ -84,11 +99,14 @@ class NLL:
         L = m.log(1./v)
         return self.rnnllp(self.as0,self.b0,self.b1,self.a,self.b,L,self.nf)
 
+    def RNLLcp(self,v):
+        L = m.log(1./v)
+        return self.rnllcp(self.as0,self.b0,self.b1,self.a,self.b,L,self.nf)
+
     def Rpp(self,v):
         L = m.log(1./v)
         A1 = 2*CF
         return 2.*CF*self.rpp(self.as0,self.b0,self.a,self.b,L)
-#TAKE FROM B.12 A.1 is 2CF ignore alpha_s/pi, lambda is here already
 
     def logF(self,v):
         rp = self.Rp(v)
