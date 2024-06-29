@@ -6,7 +6,7 @@ import numpy as np
 # Define the values of asif and min_t to iterate over
 asif_values = [0.01, 0.008, 0.006, 0.004, 0.0025]
 min_t_values = [1e-18, 1e-22, 1e-25, 1e-28, 1e-34]
-evs = 50000
+evs = 500000
 
 # Define a function to run the main script with specific asif and min_t values
 def run_main_script(asif, min_t):

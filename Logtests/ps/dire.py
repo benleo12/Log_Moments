@@ -5,7 +5,7 @@ from particle import Particle, CheckEvent
 from qcd import AlphaS, NC, TR, CA, CF
 
 K = (67./18.-pow(m.pi,2)/6.)*CA-10./9.*TR*5
-K=0
+#K=0
 class Kernel:
 
     def __init__(self,flavs,Ca,alphamax,alpha):
@@ -17,7 +17,7 @@ class Kernel:
 class Soft (Kernel):
 
     def Value(self,z,k2,t):
-        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2)-2)*(1+self.alpha(t)/(2*m.pi)*K)
+        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2)-2)*(1+self.alpha(t)/(2*m.pi)*K/2)
     def Estimate(self,z,k02):
         return self.Ca*2*(-z[1])/(z[1]*z[1]+k02)*(1+self.alphamax/(2*m.pi)*K)
     def Integral(self,k02):

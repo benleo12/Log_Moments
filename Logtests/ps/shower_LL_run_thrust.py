@@ -6,8 +6,8 @@ print("Script started")
 parser = argparse.ArgumentParser(description='Process events and analyze thrust.')
 parser.add_argument('--e', type=int, default=20000, help='Number of samples to process')
 parser.add_argument('--n_step', type=int, default=100, help='Number of steps in the process')
-parser.add_argument('--step_frac', type=float, default=1.1, help='Fractional step increase per iteration')
-parser.add_argument('--samp_fac', type=float, default=10, help='Sample factor for scaling')
+parser.add_argument('--step_frac', type=float, default=1, help='Fractional step increase per iteration')
+parser.add_argument('--samp_fac', type=float, default=1, help='Sample factor for scaling')
 parser.add_argument('--asif', type=float, default=0.02, help='alphas limit')
 parser.add_argument('--min_t', type=float, default=1e-8, help='alphas limit')
 # Debugging: Verify this line is executed
@@ -54,7 +54,7 @@ alpha_s = 0.118
 
 # Integration range
 #min_tau = 10**-10
-max_tau = 0.001
+max_tau = 0.003
 coeff = 2 * alpha_s / (3 * np.pi)
 
 alphas = [ AlphaS(91.1876,asif,0), AlphaS(91.1876,asif,0) ]
