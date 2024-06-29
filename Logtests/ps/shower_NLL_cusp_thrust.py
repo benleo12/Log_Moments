@@ -67,7 +67,7 @@ def wLL(tau):
      exponC = np.exp(-analytics.R_L(tau)-analytics.R_NLLc(tau))
      return partC*exponC
 
-def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=10000000):
+def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=100000000):
     # Create logarithmically spaced points
     x = torch.logspace(torch.log10(a), torch.log10(b), steps=num_steps, dtype=torch.float64)
 
@@ -161,11 +161,11 @@ def integral_equation_2_direct(lambda_0,lambda_1, lambda_2, tau_i, n_samp):
 
 # Initialize the Lagrange multipliers
 lambda_0 = torch.tensor([0.2819207*0], requires_grad=True)
-lambda_1 = torch.tensor([0.28430208563], requires_grad=True)
-lambda_2 = torch.tensor([0.5], requires_grad=True)
+lambda_2 = torch.tensor([0.28430208563], requires_grad=True)
+lambda_1 = torch.tensor([0.09085331112146378], requires_grad=True)
 
 # Define the optimizer
-optimizer = optim.Adam([lambda_1,lambda_2], lr=0.001)
+optimizer = optim.Adam([lambda_2], lr=0.001)
 
 # Optimization loop
 # Lists to collect data
@@ -173,7 +173,7 @@ lambda_1_values = []
 lambda_2_values = []
 loss_values = []
 n_samp_values = []
-min_loss = 4e-4
+min_loss = 1e-10
 no_decrease_counter = 0
 max_no_decrease_steps = 10
 
@@ -202,7 +202,7 @@ for step in range(1000000):
     optimizer.zero_grad()
     loss_1 = torch.abs(integral_equation_1_direct(lambda_0, lambda_1, lambda_2, filtered_tau_i, n_samp))
     loss_2 = torch.abs(integral_equation_2_direct(lambda_0, lambda_1, lambda_2, filtered_tau_i, n_samp))
-    loss = loss_1+loss_2
+    loss = loss_2
 
 
     if torch.isnan(loss):
