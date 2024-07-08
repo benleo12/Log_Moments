@@ -17,7 +17,7 @@ class Soft:
         skj = pk.SmallMLDP(pj)
         D = sij*(pk*n)+skj*(pi*n)
         if D == 0: return mn(0)
-        A = 2*sik*(pi*n)/D/2
+        A = 2*sik*(pi*n)/D
         return self.Ca*A
     def Estimate(self,z,ip):
         return self.Ca*4/(-z[1])

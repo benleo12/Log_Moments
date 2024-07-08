@@ -10,6 +10,7 @@ parser.add_argument('--step_frac', type=float, default=1, help='Fractional step 
 parser.add_argument('--samp_fac', type=float, default=1, help='Sample factor for scaling')
 parser.add_argument('--asif', type=float, default=0.02, help='alphas limit')
 parser.add_argument('--min_t', type=float, default=1e-8, help='alphas limit')
+parser.add_argument('--max_t', type=float, default=1e-8, help='alphas limit')
 # Debugging: Verify this line is executed
 print("Debug: Adding arguments complete")
 import sys
@@ -23,6 +24,7 @@ step_frac = args.step_frac
 samp_fac = args.samp_fac
 asif = args.asif
 min_tau = args.min_t
+max_tau = args.max_t
 
 
 # Define a function to save parameters to a file
@@ -54,7 +56,7 @@ alpha_s = 0.118
 
 # Integration range
 #min_tau = 10**-10
-max_tau = 0.003
+#max_tau = 0.9999
 coeff = 2 * alpha_s / (3 * np.pi)
 
 alphas = [ AlphaS(91.1876,asif,0), AlphaS(91.1876,asif,0) ]
@@ -111,7 +113,7 @@ min_tau = torch.tensor(min_tau)
 max_tau = torch.tensor(max_tau)
 
 CLL0 = torch_quad(wLL, min_tau, max_tau)
-CLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_L)
+CLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_L)/CLL0
 #CLL = torch_quad(wLL, min_tau, max_tau, func_mul=torch.log)#/CLL0
 
 print("CLL0=",CLL0)
@@ -179,10 +181,10 @@ def integral_equation_2_direct(lambda_0,lambda_1, lambda_2, tau_i, n_samp):
 # Initialize the Lagrange multipliers
 lambda_0 = torch.tensor([0.2819207*0], requires_grad=True)
 lambda_1 = torch.tensor([0.3137269*0], requires_grad=True)
-lambda_2 = torch.tensor([0.5], requires_grad=True)
+lambda_2 = torch.tensor([0.0], requires_grad=True)
 
 # Define the optimizer
-optimizer = optim.Adam([lambda_2], lr=0.01)
+optimizer = optim.Adam([lambda_2], lr=0.0001)
 
 # Optimization loop
 # Lists to collect data
@@ -190,7 +192,7 @@ lambda_1_values = []
 lambda_2_values = []
 loss_values = []
 n_samp_values = []
-min_loss = 1e-5
+min_loss = 1e-7
 no_decrease_counter = 0
 max_no_decrease_steps = 10
 
@@ -215,7 +217,7 @@ print("zero taus = ", len(filtered_tau_0))
 for step in range(1000000):
 
     print(f"Running optimization step {step+1}")
-    
+
     filtered_tau_i = tau_i[(tau_i >= min_tau) & (tau_i <= max_tau)]
     optimizer.zero_grad()
     loss_1 = torch.abs(integral_equation_1_direct(lambda_0, lambda_1, lambda_2, filtered_tau_i, n_samp))

@@ -58,6 +58,7 @@ ecms = mn(opts.ecms)
 lam = mn(opts.asmz)/mn(opts.alphas)
 t0 = mypow(mn(opts.cut)/ecms**2,lam)*ecms**2
 alphas = AlphaS(ecms,mn(opts.alphas),int(opts.order))
+
 #if MPI.COMM_WORLD.Get_rank() == 0:
 print("t_0 = {0}, log(Q^2/t_0) = {1}, \\alpha_s(t_0) = {2}". \
           format(t0,mylog(ecms**2/t0),alphas(t0)))
@@ -98,7 +99,7 @@ import matplotlib.pyplot as plt
 from scipy.integrate import quad
 # Integration range
 min_tau = 10**-35#10
-max_tau = 0.1#0.1
+max_tau = 1e-10#0.1
 
 
 alphas = [ AlphaS(ecms,mn(opts.alphas),0),
@@ -162,6 +163,7 @@ CNLL0, _ = quad(lambda t: wNLL(t), min_tau, max_tau)
 CNLL1, _ = quad(lambda t: wNLL(t) * ((analytics.R_SL(t)-analytics.logF(t))), min_tau, max_tau)
 CNLL2, _ = quad(lambda t: wNLL(t) * (analytics.R_L(t)), min_tau, max_tau)
 
+print("CLL2 = ",CLL2)
 
 #lambda_0 = 0.281920760869
 lambda_0 = 0
@@ -173,9 +175,8 @@ lambda_0 = 0
 lambda_2 = 0.0
 
 lambda_1 = 0.0
-lambda_2 = 0.068702504
-
-
+lambda_2 = 0.1319749653339386
+lambda_2 = 2.3842785358428955
 
 def weight(tau_i):
 #return  np.exp(lambda_0 - lambda_1 * np.log(t) - lambda_2 * np.log(t)**2)

@@ -10,6 +10,8 @@ parser.add_argument('--step_frac', type=float, default=1, help='Fractional step 
 parser.add_argument('--samp_fac', type=float, default=1, help='Sample factor for scaling')
 parser.add_argument('--asif', type=float, default=0.02, help='alphas limit')
 parser.add_argument('--min_t', type=float, default=1e-15, help='alphas limit')
+parser.add_argument('--max_t', type=float, default=0.9999, help='alphas limit')
+parser.add_argument('--lam_LLc', type=float, default=0, help='alphas limit')
 # Debugging: Verify this line is executed
 print("Debug: Adding arguments complete")
 import sys
@@ -23,6 +25,8 @@ step_frac = args.step_frac
 samp_fac = args.samp_fac
 asif = args.asif
 min_tau = args.min_t
+max_tau = args.max_t
+lam_LLc = args.lam_LLc
 
 
 # Define a function to save parameters to a file
@@ -54,8 +58,7 @@ alpha_s = 0.118
 
 # Integration range
 #min_tau = 10**-10
-max_tau = 0.003
-coeff = 2 * alpha_s / (3 * np.pi)
+#max_tau = 0.003
 
 alphas = [ AlphaS(91.1876,asif,0), AlphaS(91.1876,asif,1) ]
 analytics = nll_torch.NLL(alphas,a=1,b=1,t=91.1876**2)
@@ -67,7 +70,7 @@ def wLL(tau):
      exponC = np.exp(-analytics.R_L(tau)-analytics.R_NLLc(tau))
      return partC*exponC
 
-def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=100000000):
+def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=10000000):
     # Create logarithmically spaced points
     x = torch.logspace(torch.log10(a), torch.log10(b), steps=num_steps, dtype=torch.float64)
 
@@ -96,8 +99,8 @@ min_tau = torch.tensor(min_tau)
 max_tau = torch.tensor(max_tau)
 
 CLL0 = torch_quad(wLL, min_tau, max_tau)
-CLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_L)
-CNLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_NLLc)
+CLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_L)/CLL0
+CNLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_NLLc)/CLL0
 #CLL = torch_quad(wLL, min_tau, max_tau, func_mul=torch.log)#/CLL0
 
 print("CLL0=",CLL0)
@@ -162,7 +165,7 @@ def integral_equation_2_direct(lambda_0,lambda_1, lambda_2, tau_i, n_samp):
 # Initialize the Lagrange multipliers
 lambda_0 = torch.tensor([0.2819207*0], requires_grad=True)
 lambda_2 = torch.tensor([0.28430208563], requires_grad=True)
-lambda_1 = torch.tensor([0.09085331112146378], requires_grad=True)
+lambda_1 = torch.tensor([lam_LLc], requires_grad=True)
 
 # Define the optimizer
 optimizer = optim.Adam([lambda_2], lr=0.001)

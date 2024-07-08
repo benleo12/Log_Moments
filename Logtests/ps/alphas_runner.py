@@ -6,13 +6,15 @@ import numpy as np
 # Define the values of asif and min_t to iterate over
 asif_values = [0.01, 0.008, 0.006, 0.004, 0.0025]
 min_t_values = [1e-18, 1e-22, 1e-25, 1e-28, 1e-34]
-evs = 500000
+max_t_values = [1e-8, 1e-10, 1e-12, 1e-14, 1e-16]
+evs = 100000
 
 # Define a function to run the main script with specific asif and min_t values
 def run_main_script(asif, min_t):
     command = [
-        'python3', 'shower_NLL_cusp_thrust.py',  # Replace 'main_script.py' with the actual name of your main script
+        'python3', 'shower_LL_run_thrust.py',  # Replace 'main_script.py' with the actual name of your main script
         '--asif', str(asif),
+        '--max_t', str(max_t),
         '--min_t', str(min_t),
         '--e', str(evs)
     ]
@@ -25,7 +27,8 @@ def run_main_script(asif, min_t):
 results = []
 for i in range(len(asif_values)):
     asif = asif_values[i]
-    min_t = min_t_values[i]
+    min_t = min_t_values[ii]
+    max_t = max_t_values[ii]
     run_main_script(asif, min_t)
     # Read the resulting lambda_2 from params.txt
     if os.path.exists('params.txt'):

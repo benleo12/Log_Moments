@@ -17,7 +17,7 @@ class Kernel:
 class Soft (Kernel):
 
     def Value(self,z,k2,t):
-        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2)-2)*(1+self.alpha(t)/(2*m.pi)*K/2)
+        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2)-2)*(1+self.alpha(t)/(2*m.pi)*K)
     def Estimate(self,z,k02):
         return self.Ca*2*(-z[1])/(z[1]*z[1]+k02)*(1+self.alphamax/(2*m.pi)*K)
     def Integral(self,k02):
