@@ -198,8 +198,8 @@ no_decrease_counter = 0
 max_no_decrease_steps = 10
 
 # Generate data once
-pypy_script_path = os.path.expanduser('~/Dropbox/LogMoments/Logtests/ps/dire.py')
-thrust_path = os.path.expanduser('~/Dropbox/LogMoments/Logtests/ps/thrust_values.csv')
+pypy_script_path = os.path.expanduser('dire.py')
+thrust_path = os.path.expanduser('thrust_values.csv')
 
 if run_pypy_script(pypy_script_path):
     if os.path.exists(thrust_path):

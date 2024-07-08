@@ -1,6 +1,8 @@
 import torch as m
+import math
 import random as r
 import scipy.special as sp
+m.pi = math.pi
 
 from vector import Vec4
 from qcd import AlphaS, NC, TR, CA, CF

@@ -361,7 +361,7 @@ if __name__== "__main__":
     thrust_values = jetrat.Finalize()
 
     import csv
-    with open('thrust_values.csv', 'wb') as csvfile:  # Note 'wb' for Python 2.7
+    with open('thrust_values.csv', 'w') as csvfile:
         writer = csv.writer(csvfile)
         for value in thrust_values:
             writer.writerow([value])
