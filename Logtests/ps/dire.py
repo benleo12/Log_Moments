@@ -5,7 +5,7 @@ from particle import Particle, CheckEvent
 from qcd import AlphaS, NC, TR, CA, CF
 
 K = (67./18.-pow(m.pi,2)/6.)*CA-10./9.*TR*5
-#K=0
+K=0
 class Kernel:
 
     def __init__(self,flavs,Ca,alphamax,alpha):

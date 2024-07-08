@@ -49,7 +49,8 @@ import nll_torch
 from qcd import AlphaS, NC, TR, CA, CF
 from scipy.integrate import quad
 
-
+torch.set_default_dtype(torch.float64)
+torch.set_default_tensor_type(torch.DoubleTensor)
 
 # Assuming alpha_s is a known constant
 alpha_s = 0.118
@@ -184,7 +185,7 @@ lambda_1 = torch.tensor([0.3137269*0], requires_grad=True)
 lambda_2 = torch.tensor([0.0], requires_grad=True)
 
 # Define the optimizer
-optimizer = optim.Adam([lambda_2], lr=0.0001)
+optimizer = optim.Adam([lambda_2], lr=0.01)
 
 # Optimization loop
 # Lists to collect data
@@ -192,7 +193,7 @@ lambda_1_values = []
 lambda_2_values = []
 loss_values = []
 n_samp_values = []
-min_loss = 1e-7
+min_loss = 1e-5
 no_decrease_counter = 0
 max_no_decrease_steps = 10
 

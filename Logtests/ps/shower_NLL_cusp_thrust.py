@@ -51,7 +51,8 @@ import nll_torch
 from qcd import AlphaS, NC, TR, CA, CF
 from scipy.integrate import quad
 
-
+torch.set_default_dtype(torch.float64)
+torch.set_default_tensor_type(torch.DoubleTensor)
 
 # Assuming alpha_s is a known constant
 alpha_s = 0.118
@@ -73,13 +74,15 @@ def wLL(tau):
 def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=10000000):
     # Create logarithmically spaced points
     x = torch.logspace(torch.log10(a), torch.log10(b), steps=num_steps, dtype=torch.float64)
-
+    print("a,b = ",a,b)
+    print("x = ",x)  
     # Calculate differential elements, adjusted for log spacing
     dx = (x[1:] - x[:-1])  # More accurate differential using actual spacing between points
 
+    print("dx = ",dx)
     # Evaluate the function at these points
     y = func(x[:-1])  # Evaluate function at left endpoints (or midpoints if preferred)
-
+    print("y = ",y)
     # Apply any additional multiplicative functions if provided
     if func_mul is not None:
         y *= func_mul(x[:-1])
@@ -94,8 +97,9 @@ def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=10000000):
     integral = torch.sum(y_dx)
     return integral
 
-
+print("min_tau bef=",min_tau)
 min_tau = torch.tensor(min_tau)
+print("min_tau aft=",min_tau)
 max_tau = torch.tensor(max_tau)
 
 CLL0 = torch_quad(wLL, min_tau, max_tau)
@@ -168,7 +172,7 @@ lambda_2 = torch.tensor([0.28430208563], requires_grad=True)
 lambda_1 = torch.tensor([lam_LLc], requires_grad=True)
 
 # Define the optimizer
-optimizer = optim.Adam([lambda_2], lr=0.001)
+optimizer = optim.Adam([lambda_2], lr=0.01)
 
 # Optimization loop
 # Lists to collect data
@@ -205,7 +209,7 @@ for step in range(1000000):
     optimizer.zero_grad()
     loss_1 = torch.abs(integral_equation_1_direct(lambda_0, lambda_1, lambda_2, filtered_tau_i, n_samp))
     loss_2 = torch.abs(integral_equation_2_direct(lambda_0, lambda_1, lambda_2, filtered_tau_i, n_samp))
-    loss = loss_2
+    loss = loss_2#+loss_1
 
 
     if torch.isnan(loss):

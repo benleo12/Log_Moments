@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Define the values of asif and min_t to iterate over
-asif_values = [0.01, 0.008, 0.006, 0.004, 0.0025]
-min_t_values = [1e-18, 1e-22, 1e-25, 1e-28, 1e-34]
-max_t_values = [1e-8, 1e-10, 1e-12, 1e-14, 1e-16]
+asif_values = [0.04, 0.02, 0.01, 0.005, 0.0025]
+min_t_values = [1e-6, 1e-12, 1e-24, 1e-48, 1e-96]
+max_t_values = [1e-2, 1e-4, 1e-8, 1e-16, 1e-32]
 evs = 100000
 
 # Define a function to run the main script with specific asif and min_t values
@@ -27,8 +27,8 @@ def run_main_script(asif, min_t):
 results = []
 for i in range(len(asif_values)):
     asif = asif_values[i]
-    min_t = min_t_values[ii]
-    max_t = max_t_values[ii]
+    min_t = min_t_values[i]
+    max_t = max_t_values[i]
     run_main_script(asif, min_t)
     # Read the resulting lambda_2 from params.txt
     if os.path.exists('params.txt'):

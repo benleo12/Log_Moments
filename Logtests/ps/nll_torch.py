@@ -14,7 +14,7 @@ class NLL:
         self.as0 = self.alpha[0](t)
         self.b0 = self.alpha[0].beta0(5)/(2.*m.pi)
         self.b1 = self.alpha[1].beta1(5)/pow(2.*m.pi,2)
-        self.K = (67./18.-pow(m.pi,2)/6.)*CA-10./9.*TR*5
+        self.K = 0#(67./18.-pow(m.pi,2)/6.)*CA-10./9.*TR*5
         self.nf = 5
 
     def r1(self,as0,b0,a,b,L):
