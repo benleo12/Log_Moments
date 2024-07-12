@@ -17,7 +17,7 @@ class Kernel:
 class Soft (Kernel):
 
     def Value(self,z,k2,t):
-        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2)-2)*(1+self.alpha(t)/(2*m.pi)*K)
+        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2)-2)*(1+self.alpha(t)/(2*m.pi)*K)/(z[0]+z[1])
     def Estimate(self,z,k02):
         return self.Ca*2*(-z[1])/(z[1]*z[1]+k02)*(1+self.alphamax/(2*m.pi)*K)
     def Integral(self,k02):
@@ -331,7 +331,7 @@ if __name__== "__main__":
     ecms = mn(opts.ecms)
     lam = mn(opts.asmz)/mn(opts.alphas)
     t0 = mypow(mn(opts.cut)/ecms**2,lam)*ecms**2
-    alphas = AlphaS(ecms,mn(opts.alphas),int(opts.order))
+    alphas = AlphaS(ecms,mn(opts.alphas),int(opts.order),mb=1e-3,mc=1e-4)
     print("t_0 = {0}, log(Q^2/t_0) = {1}, \\alpha_s(t_0) = {2}". \
           format(t0,mylog(ecms**2/t0),alphas(t0)))
     shower = Shower(alphas,t0,int(opts.coll),mn(opts.beta),

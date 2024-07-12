@@ -17,7 +17,7 @@ class Soft:
         skj = pk.SmallMLDP(pj)
         D = sij*(pk*n)+skj*(pi*n)
         if D == 0: return mn(0)
-        A = 2*sik*(pi*n)/D
+        A = 2*sik*(pi*n)/D/(z[0]+z[1])
         return self.Ca*A
     def Estimate(self,z,ip):
         return self.Ca*4/(-z[1])
@@ -354,7 +354,7 @@ if __name__== "__main__":
     ecms = mn(opts.ecms)
     lam = mn(opts.asmz)/mn(opts.alphas)
     t0 = mypow(mn(opts.cut)/ecms**2,lam)*ecms**2
-    alphas = AlphaS(ecms,mn(opts.alphas),int(opts.order))
+    alphas = AlphaS(ecms,mn(opts.alphas),int(opts.order),mb=1e-3,mc=1e-4)
     print("t_0 = {0}, log(Q^2/t_0) = {1}, \\alpha_s(t_0) = {2}". \
           format(t0,mylog(ecms**2/t0),alphas(t0)))
     shower = Shower(alphas,t0,int(opts.coll),mn(opts.beta),
