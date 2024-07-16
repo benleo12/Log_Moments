@@ -9,8 +9,6 @@ parser.add_argument('--n_step', type=int, default=100, help='Number of steps in 
 parser.add_argument('--step_frac', type=float, default=1, help='Fractional step increase per iteration')
 parser.add_argument('--samp_fac', type=float, default=1, help='Sample factor for scaling')
 parser.add_argument('--asif', type=float, default=0.02, help='alphas limit')
-parser.add_argument('--min_t', type=float, default=1e-8, help='alphas limit')
-parser.add_argument('--max_t', type=float, default=1e-8, help='alphas limit')
 # Debugging: Verify this line is executed
 print("Debug: Adding arguments complete")
 import sys
@@ -23,8 +21,6 @@ n_step = args.n_step
 step_frac = args.step_frac
 samp_fac = args.samp_fac
 asif = args.asif
-min_tau = args.min_t
-max_tau = args.max_t
 
 
 # Define a function to save parameters to a file
@@ -55,9 +51,6 @@ torch.set_default_tensor_type(torch.DoubleTensor)
 # Assuming alpha_s is a known constant
 alpha_s = 0.118
 
-# Integration range
-#min_tau = 10**-10
-#max_tau = 0.9999
 coeff = 2 * alpha_s / (3 * np.pi)
 
 alphas = [ AlphaS(91.1876,asif,0), AlphaS(91.1876,asif,0) ]
@@ -66,65 +59,26 @@ analytics = nll_torch.NLL(alphas,a=1,b=1,t=91.1876**2)
 
 # Define wLL and wNLL functions
 def wLL(tau):
-     partC = (analytics.Rp(tau))/tau
+     partC = analytics.Rp(tau)/tau
      exponC = np.exp(-analytics.R_L(tau))
      return partC*exponC
 
-def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=10000000):
-    # Create logarithmically spaced points
+def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=1000000):
     x = torch.logspace(torch.log10(a), torch.log10(b), steps=num_steps, dtype=torch.float64)
-
-    # Calculate differential elements, adjusted for log spacing
-    dx = (x[1:] - x[:-1])  # More accurate differential using actual spacing between points
-
-    # Evaluate the function at these points
-    y = func(x[:-1])  # Evaluate function at left endpoints (or midpoints if preferred)
-
-    # Apply any additional multiplicative functions if provided
+    dx = (x[1:]-x[:-1])
+    y = (func(x[1:])+func(x[:-1]))/2.
     if func_mul is not None:
-        y *= func_mul(x[:-1])
+        y *= (func_mul(x[1:])+func_mul(x[:-1]))/2.
     if func_mul2 is not None:
-        y *= func_mul2(x[:-1])
-
-    # Debug print to check values of y*dx
+        y *= (func_mul2(x[1:])+func_mul2(x[:-1]))/2.
     y_dx = y * dx
-    print("YDX:", torch.sum(y_dx))
-
-    # Sum up y*dx to get the integral approximation
     integral = torch.sum(y_dx)
     return integral
-
-
-def torch_quad_old(func, a, b, func_mul=None, func_mul2=None, num_steps=100000):
-    x = torch.logspace(torch.log10(a), torch.log10(b), steps=num_steps, dtype=torch.float64)
-    dx = np.log(10)*(torch.log10(b) - torch.log10(a))*x / num_steps
-    y = func(x)
-    #print("y before applying func_mul:", y)
-    if func_mul is not None:
-        y = y*func_mul(x)
-    if func_mul2 is not None:
-        y = y*func_mul2(x)
-    #print("y after applying func_mul:", y)
-    print("YDX:",torch.sum(y * dx))
-    return torch.sum(y * dx)
-
-
-
-min_tau = torch.tensor(min_tau)
-max_tau = torch.tensor(max_tau)
-
-CLL0 = torch_quad(wLL, min_tau, max_tau)
-CLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_L)/CLL0
-#CLL = torch_quad(wLL, min_tau, max_tau, func_mul=torch.log)#/CLL0
-
-print("CLL0=",CLL0)
-print("CLL=",CLL)
-
 
 def run_pypy_script(pypy_script_path):
     """Runs the PyPy script with specified flags that generates the CSV file."""
     # Define the additional flags as a list
-    flags = ['-e',str(n_samp), '-A',str(asif), '-n','1', '-O','0','-b','1']
+    flags = ['-e',str(n_samp),'-A',str(asif),'-n','1','-O','0','-b','1','-c','0','-C','1']
 
     try:
         # Include the additional flags in the subprocess call
@@ -162,20 +116,13 @@ def integral_equation_1_direct(lambda_0, lambda_1, lambda_2, tau_i, n_samp):
     moment = 1
     integral = mc_integration(expon*part*moment, tau_i, n_samp)/mc_integration(expon*part, tau_i, n_samp)
     integral_0 = mc_integration(torch.ones(len(tau_i)), tau_i, n_samp)
-    print("check unitary:",integral)
-    print("check unitary 1:",integral_0)
     return integral - CLL0
 
 def integral_equation_2_direct(lambda_0,lambda_1, lambda_2, tau_i, n_samp):
-    Rpt = analytics.Rp(tau_i)
-    logFt = analytics.logF(tau_i)
-    FpFt = analytics.FpF(tau_i)
-    RNNLLpt = analytics.RNNLLp(tau_i)
     part = (CLL)/((CLL-lambda_2))
-    expon = torch.exp( -  lambda_2*analytics.R_L(tau_i))
+    expon = torch.exp( -lambda_2*analytics.R_L(tau_i))
     moment = analytics.R_L(tau_i)
-    #moment = torch.log(tau_i)**2
-    integral = mc_integration(expon*part*moment, tau_i, n_samp)/mc_integration(expon*part, tau_i, n_samp)
+    integral = mc_integration(expon*part*moment, tau_i, n_samp)#/mc_integration(expon*part, tau_i, n_samp)
     return integral - CLL
 
 
@@ -211,33 +158,41 @@ else:
     print("PyPy script execution failed.")
     raise RuntimeError("Data generation failed. Exiting.")
 
-filtered_tau_0 = tau_i[(tau_i <= min_tau)]
-filtered_tau_i = tau_i[(tau_i >= min_tau) & (tau_i <= max_tau)]
+filtered_tau_0 = tau_i[(tau_i != 0.0)]
 print("zero taus = ", len(filtered_tau_0))
+
+min_tau = (torch.min(filtered_tau_0))
+max_tau = (torch.max(filtered_tau_0))
+
+print("min/max",min_tau,max_tau)
+
+filtered_tau_i = tau_i[(tau_i >= min_tau) & (tau_i <= max_tau)]
+
+CLL0 = torch_quad(wLL, min_tau, max_tau)
+CLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_L)
+
+print("CLL0=",CLL0)
+print("CLL=",CLL)
 
 for step in range(1000000):
 
-    print(f"Running optimization step {step+1}")
+    #print(f"Running optimization step {step+1}")
 
-    filtered_tau_i = tau_i[(tau_i >= min_tau) & (tau_i <= max_tau)]
     optimizer.zero_grad()
-    loss_1 = torch.abs(integral_equation_1_direct(lambda_0, lambda_1, lambda_2, filtered_tau_i, n_samp))
-    loss_2 = torch.abs(integral_equation_2_direct(lambda_0, lambda_1, lambda_2, filtered_tau_i, n_samp))
-    loss = loss_2
-
+    loss = torch.abs(integral_equation_2_direct(lambda_0, lambda_1, lambda_2, filtered_tau_i, n_samp))
 
     if torch.isnan(loss):
      continue
     loss.backward()
     optimizer.step()
 
-    print(f"Step {step}, Loss: {loss.item()}, Lambda 0: {lambda_0.item()}, Lambda 1: {lambda_1.item()}, Lambda 2: {lambda_2.item()}")
+    print("Step {}, Loss: {}, Lambda 0: {}, Lambda 1: {}, Lambda 2: {}\r".format(step,loss.item(),lambda_0.item(),lambda_1.item(),lambda_2.item()), end='', flush=True)
 
     if step >0 and step % (n_step+5) == 0:
-        print(f"Step {step}, Loss: {loss.item()}, Lambda 0: {lambda_0.item()}, Lambda 1: {lambda_1.item()}, Lambda 2: {lambda_2.item()}")
+        #print(f"Step {step}, Loss: {loss.item()}, Lambda 0: {lambda_0.item()}, Lambda 1: {lambda_1.item()}, Lambda 2: {lambda_2.item()}")
         n_samp = int(n_samp*samp_fac)
         n_step = int(n_step/step_frac)
-        print("n_step = ", n_step)
+        # print("n_step = ", n_step)
         lambda_1_values.append(lambda_1.item())
         lambda_2_values.append(lambda_2.item())
         loss_values.append(loss.item())

@@ -71,18 +71,14 @@ def wLL(tau):
      exponC = np.exp(-analytics.R_L(tau)-analytics.R_NLLc(tau))
      return partC*exponC
 
-def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=10000000):
+def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=1000000):
     # Create logarithmically spaced points
     x = torch.logspace(torch.log10(a), torch.log10(b), steps=num_steps, dtype=torch.float64)
-    print("a,b = ",a,b)
-    print("x = ",x)  
     # Calculate differential elements, adjusted for log spacing
     dx = (x[1:] - x[:-1])  # More accurate differential using actual spacing between points
 
-    print("dx = ",dx)
     # Evaluate the function at these points
     y = func(x[:-1])  # Evaluate function at left endpoints (or midpoints if preferred)
-    print("y = ",y)
     # Apply any additional multiplicative functions if provided
     if func_mul is not None:
         y *= func_mul(x[:-1])
@@ -91,15 +87,13 @@ def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=10000000):
 
     # Debug print to check values of y*dx
     y_dx = y * dx
-    print("YDX:", torch.sum(y_dx))
+    # print("YDX:", torch.sum(y_dx))
 
     # Sum up y*dx to get the integral approximation
     integral = torch.sum(y_dx)
     return integral
 
-print("min_tau bef=",min_tau)
 min_tau = torch.tensor(min_tau)
-print("min_tau aft=",min_tau)
 max_tau = torch.tensor(max_tau)
 
 CLL0 = torch_quad(wLL, min_tau, max_tau)
@@ -118,7 +112,7 @@ def run_pypy_script(pypy_script_path):
 
     try:
         # Include the additional flags in the subprocess call
-        subprocess.check_call(['pypy', pypy_script_path] + flags)
+        subprocess.check_call(['pypy3', pypy_script_path] + flags)
     except subprocess.CalledProcessError as e:
         print("An error occurred while running the PyPy script:", e)
         return False
@@ -185,8 +179,8 @@ no_decrease_counter = 0
 max_no_decrease_steps = 10
 
 # Generate data once
-pypy_script_path = os.path.expanduser('~/Dropbox/LogMoments/Logtests/ps/dire.py')
-thrust_path = os.path.expanduser('~/Dropbox/LogMoments/Logtests/ps/thrust_values.csv')
+pypy_script_path = os.path.expanduser('dire.py')
+thrust_path = os.path.expanduser('thrust_values.csv')
 
 if run_pypy_script(pypy_script_path):
     if os.path.exists(thrust_path):
@@ -213,7 +207,7 @@ for step in range(1000000):
 
 
     if torch.isnan(loss):
-     continue
+        continue
     loss.backward()
     optimizer.step()
 

@@ -38,48 +38,16 @@ class AlphaS:
             return mn(0)
 
     def as0(self,t,nf):
-        if nf > 0:
-            tref = self.mz2
-            asref = self.asmz
-            b0 = self.beta0(nf)/(2*m.pi)
-            return 1/(1/asref+b0*mylog(t/tref))
-        if t >= self.mb2:
-            tref = self.mz2
-            asref = self.asmz
-            b0 = self.beta0(5)/(2*m.pi)
-        elif t >= self.mc2:
-            tref = self.mb2
-            asref = self.asmb
-            b0 = self.beta0(4)/(2*m.pi)
-        else:
-            tref = self.mc2
-            asref = self.asmc
-            b0 = self.beta0(3)/(2*m.pi)
+        tref = self.mz2
+        asref = self.asmz
+        b0 = self.beta0(5)/(2*m.pi)
         return 1/(1/asref+b0*mylog(t/tref))
 
     def as1(self,t,nf):
-        if nf > 0:
-            tref = self.mz2
-            asref = self.asmz
-            b0 = self.beta0(nf)/(2*m.pi)
-            b1 = self.beta1(nf)/pow(2*m.pi,2)
-            w = 1+b0*asref*mylog(t/tref)
-            return asref/w*(1-b1/b0*asref*mylog(w)/w)
-        if t >= self.mb2:
-            tref = self.mz2
-            asref = self.asmz
-            b0 = self.beta0(5)/(2*m.pi)
-            b1 = self.beta1(5)/pow(2*m.pi,2)
-        elif t >= self.mc2:
-            tref = self.mb2
-            asref = self.asmb
-            b0 = self.beta0(4)/(2*m.pi)
-            b1 = self.beta1(4)/pow(2*m.pi,2)
-        else:
-            tref = self.mc2
-            asref = self.asmc
-            b0 = self.beta0(3)/(2*m.pi)
-            b1 = self.beta1(3)/pow(2*m.pi,2)
+        tref = self.mz2
+        asref = self.asmz
+        b0 = self.beta0(nf)/(2*m.pi)
+        b1 = self.beta1(nf)/pow(2*m.pi,2)
         w = 1+b0*asref*mylog(t/tref)
         return asref/w*(1-b1/b0*asref*mylog(w)/w)
 
