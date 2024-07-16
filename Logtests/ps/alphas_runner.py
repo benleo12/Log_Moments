@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Define the values of asif and min_t to iterate over
-asif_values = [0.04, 0.02, 0.01, 0.005, 0.0025]
+asif_values = [0.02, 0.01, 0.005, 0.0025]
 evs = 400000
 
 # Define a function to run the main script with specific asif and min_t values
@@ -38,7 +38,7 @@ with open('all_params.txt', 'w') as f:
 
 # Extract asif and lambda_2 values for plotting
 asif_plot_values = [result[0] for result in results]
-lambda_2_plot_values = [result[2] for result in results]
+lambda_2_plot_values = [result[1] for result in results]
 
 # Plot lambda_2 vs. asif
 plt.plot(asif_plot_values, lambda_2_plot_values, marker='o', label='Data')
