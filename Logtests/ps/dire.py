@@ -5,7 +5,7 @@ from particle import Particle, CheckEvent
 from qcd import AlphaS, NC, TR, CA, CF
 
 K = (67./18.-pow(m.pi,2)/6.)*CA-10./9.*TR*5
-K=0
+
 class Kernel:
 
     def __init__(self,flavs,Ca,alphamax,alpha):
@@ -312,6 +312,7 @@ if __name__== "__main__":
     parser.add_option("-q","--quad",default=0,action="count",dest="quad")
     parser.add_option("-K","--cluster",default=5,dest="cas")
     parser.add_option("-l","--logfile",default="",dest="logfile")
+    parser.add_option("-x","--piece",default="all",dest="piece")
     (opts,args) = parser.parse_args()
 
     opts.histo = opts.histo.format(**vars(opts))
@@ -327,6 +328,14 @@ if __name__== "__main__":
     from particle import Particle, CheckEvent
     from qcd import AlphaS, NC, TR, CA, CF
     from analysis import SimplifiedAnalysis
+
+    if opts.piece == 'll':
+        K=0
+        opts.coll=0
+        opts.order=0
+    if opts.piece == 'nllc':
+        opts.coll=0
+        opts.order=1
 
     ecms = mn(opts.ecms)
     lam = mn(opts.asmz)/mn(opts.alphas)
