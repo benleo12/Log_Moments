@@ -18,6 +18,8 @@ print("Debug: Adding arguments complete")
 import sys
 print(sys.argv)
 
+
+
 # Parse arguments
 args = parser.parse_args()
 n_samp = args.e
@@ -28,8 +30,10 @@ asif = args.asif
 
 
 # Define a function to save parameters to a file
-def save_params(lambda_2, asif, filename="params.txt"):
+def save_params(lambda_1,lambda_2, asif):
+    filename = f"params_{args.piece}_{n_samp}.txt"
     with open(filename, 'w') as f:
+        f.write(f"lambda_1: {lambda_1}\n")
         f.write(f"lambda_2: {lambda_2}\n")
         f.write(f"asif: {asif}\n")
 
@@ -51,6 +55,11 @@ from scipy.integrate import quad
 
 torch.set_default_dtype(torch.float64)
 torch.set_default_tensor_type(torch.DoubleTensor)
+# Set the number of threads used for intra-op parallelism
+torch.set_num_threads(4)
+
+# Set the number of threads used for inter-op parallelism
+torch.set_num_interop_threads(4)
 
 # Assuming alpha_s is a known constant
 alpha_s = 0.118
@@ -83,18 +92,35 @@ def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=100000):
     integral = torch.sum(y_dx)
     return integral
 
-def run_pypy_script(pypy_script_path):
+def run_pypy_script(pypy_script_path,asif,n_samp,piece):
     """Runs the PyPy script with specified flags that generates the CSV file."""
     # Define the additional flags as a list
-    flags = ['-e',str(n_samp),'-A',str(asif),'-n','1','-b','1','-C','1','-x',args.piece]
+    flags = ['-e',str(n_samp),'-A',str(asif),'-n','1','-b','1','-C','1','-x',str(piece)]
+
+    # Create the filename based on flags and ensure it includes "LL"
+    filename = f"thrust_e{n_samp}_A{asif}_{args.piece}.csv"
+    
+    # Check if the file already exists
+    if os.path.exists(filename):
+        print(f"File {filename} already exists. Not overwriting.")
+        return filename
 
     try:
         # Include the additional flags in the subprocess call
         subprocess.check_call(['pypy', pypy_script_path] + flags)
+        
+        # Check if the expected output file exists and rename it
+        if os.path.exists("thrust_values.csv"):
+            os.rename("thrust_values.csv", filename)
+        else:
+            print("Expected output file 'thrust_values.csv' not found.")
+            return None
+        
     except subprocess.CalledProcessError as e:
         print("An error occurred while running the PyPy script:", e)
-        return False
-    return True
+        return None
+    
+    return filename
 
 def read_csv_to_torch(csv_file_path):
     """Reads the CSV file and converts it to a PyTorch tensor."""
@@ -164,21 +190,23 @@ max_no_decrease_steps = 10
 
 # Generate data once
 pypy_script_path = os.path.expanduser('dire.py')
-thrust_path = os.path.expanduser('thrust_values.csv')
+# Run the PyPy script and get the output filename
+output_filename = run_pypy_script(pypy_script_path, asif, n_samp, args.piece)
 
-if run_pypy_script(pypy_script_path):
-    if os.path.exists(thrust_path):
-        tau_i = read_csv_to_torch(thrust_path)
+if output_filename:
+    if os.path.exists(output_filename):
+        tau_i = read_csv_to_torch(output_filename)
     else:
-        print(f"CSV file not found: {thrust_path}")
+        print(f"CSV file not found: {output_filename}")
         raise RuntimeError("Data generation failed. Exiting.")
 else:
     print("PyPy script execution failed.")
     raise RuntimeError("Data generation failed. Exiting.")
 
 filtered_tau_0 = tau_i[(tau_i != 0.0)]
-print("nonzero taus = ", len(filtered_tau_0))
+print("zero taus = ", len(filtered_tau_0))
 
+# Now you can use min_tau and peak_tau in your further calculations
 min_tau = torch.min(filtered_tau_0)
 max_tau = torch.max(filtered_tau_0)
 
@@ -235,7 +263,7 @@ for step in range(1000000):
 
     # Save parameters if loss doesn't change
     if step > 0 and abs(loss.item() - loss_values[step-1]) < 1e-20:
-        save_params(lambda_2.item(), asif)
+        save_params(lambda_1.item(),lambda_2.item(), asif)
         break
     
 #    if step > 0 and loss.item() < min_loss:
