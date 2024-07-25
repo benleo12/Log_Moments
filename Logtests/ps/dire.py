@@ -8,10 +8,10 @@ K = (67./18.-pow(m.pi,2)/6.)*CA-10./9.*TR*5
 
 class Kernel:
 
-    def __init__(self,flavs,Ca,alphamax,alpha):
+    def __init__(self,flavs,Ca,alpha,t0):
         self.flavs = flavs
         self.Ca = Ca
-        self.alphamax=alphamax
+        self.alphamax=alpha(t0)
         self.alpha=alpha
 
 class Soft (Kernel):
@@ -73,21 +73,21 @@ class Shower:
             self.flat = True
             self.lmin = flat[0]
             self.lmax = flat[1]
-        self.alpha = alpha
-        self.alphamax = alpha(self.t0)
+        self.alpha = alpha[0]
+        self.alphamax = alpha[0](self.t0)
         self.amode = 0 if self.alpha.order == -1 else 1
         if self.amode != 0:
             self.alphamax = (2*m.pi)/self.alpha.beta0(5)
         self.kernels = {}
         for fl in [-5,-4,-3,-2,-1,1,2,3,4,5]:
-            self.kernels[fl] = [ Soft([fl,fl,21],CA/2 if lc else CF,self.alphamax,self.alpha) ]
-        self.kernels[21] = [ Soft([21,21,21],CA/2,self.alphamax,self.alpha) ]
+            self.kernels[fl] = [ Soft([fl,fl,21],CA/2 if lc else CF,alpha[1],self.t0) ]
+        self.kernels[21] = [ Soft([21,21,21],CA/2,alpha[1],self.t0) ]
         if coll & 1:
             for fl in [-5,-4,-3,-2,-1,1,2,3,4,5]:
-                self.kernels[fl].append( Cqq([fl,fl,21],CA/2 if lc else CF,self.alphamax,self.alpha) )
+                self.kernels[fl].append( Cqq([fl,fl,21],CA/2 if lc else CF,alpha[1],self.t0) )
         if coll & 2:
-            self.kernels[21].append( Cgg([21,21,21],CA/2,self.alphamax,self.alpha) )
-            self.kernels[21].append( Cgq([21,0,0],0,self.alphamax,self.alpha) )
+            self.kernels[21].append( Cgg([21,21,21],CA/2,alpha[1],self.t0) )
+            self.kernels[21].append( Cgq([21,0,0],0,alpha[1],self.t0) )
         self.Ca = CA/2 if lc else CF
         self.Bl = -3./4. if coll&1 else -1.
 
@@ -181,7 +181,7 @@ class Shower:
             asref = self.alpha.asa(t,5)
             if asref>0: w = self.alpha(kt**2,5)/asref
             else: w = 0
-        w *= s[2].Value(z,kt**2/s[3],t)/s[2].Estimate(z,self.ct0/s[3])
+        w *= s[2].Value(z,kt**2/s[3],kt**2)/s[2].Estimate(z,self.ct0/s[3])
         w *= 1/(1+self.beta)
         if w <= rng.random(): return False
         phi = 2*m.pi*rng.random()
@@ -329,20 +329,27 @@ if __name__== "__main__":
     from qcd import AlphaS, NC, TR, CA, CF
     from analysis import SimplifiedAnalysis
 
+    ecms = mn(opts.ecms)
+    lam = mn(opts.asmz)/mn(opts.alphas)
+    t0 = mypow(mn(opts.cut)/ecms**2,lam)*ecms**2
+
     if opts.piece == 'll':
         K=0
         opts.coll=0
         opts.order=0
+        alphas = [ AlphaS(ecms,mn(opts.alphas),0,mb=1e-3,mc=1e-4),
+                   AlphaS(ecms,mn(opts.alphas),0,mb=1e-3,mc=1e-4) ]
     if opts.piece == 'nllc':
         opts.coll=0
         opts.order=1
+        alphas = [ AlphaS(ecms,mn(opts.alphas),1,mb=1e-3,mc=1e-4),
+                   AlphaS(ecms,mn(opts.alphas),0,mb=1e-3,mc=1e-4) ]
+    else:
+        alphas = [ AlphaS(ecms,mn(opts.alphas),int(opts.order),mb=1e-3,mc=1e-4),
+                   AlphaS(ecms,mn(opts.alphas),int(opts.order),mb=1e-3,mc=1e-4) ]
 
-    ecms = mn(opts.ecms)
-    lam = mn(opts.asmz)/mn(opts.alphas)
-    t0 = mypow(mn(opts.cut)/ecms**2,lam)*ecms**2
-    alphas = AlphaS(ecms,mn(opts.alphas),int(opts.order),mb=1e-3,mc=1e-4)
-    print("t_0 = {0}, log(Q^2/t_0) = {1}, \\alpha_s(t_0) = {2}". \
-          format(t0,mylog(ecms**2/t0),alphas(t0)))
+    print("t_0 = {0}, log(Q^2/t_0) = {1}, \\alpha_s(t_0) = {2} / {3}". \
+          format(t0,mylog(ecms**2/t0),alphas[0](t0),alphas[1](t0)))
     shower = Shower(alphas,t0,int(opts.coll),mn(opts.beta),
                     mn(opts.rcut),eval(opts.flat),int(opts.nmax),opts.lc)
     jetrat = SimplifiedAnalysis(-0.0033)
