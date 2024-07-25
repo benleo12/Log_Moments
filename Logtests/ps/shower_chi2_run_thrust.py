@@ -63,12 +63,13 @@ analytics = nll_torch.NLL(alphas,a=1,b=1,t=91.1876**2)
 
 # Define wLL and wNLL functions
 def wLL(tau):
-     # partC = analytics.Rp(tau)/tau
-     # exponC = np.exp(-analytics.R_L(tau))
-     # return partC*exponC
-     partC = (analytics.Rp(tau)+analytics.RNLLcp(tau))/tau
-     exponC = np.exp( -analytics.R_L(tau)-analytics.R_NLLc(tau) )
-     return partC*exponC
+    if args.piece == 'll':  
+        partC = analytics.Rp(tau)/tau
+        exponC = np.exp(-analytics.R_L(tau))
+    else:
+        partC = (analytics.Rp(tau)+analytics.RNLLcp(tau))/tau
+        exponC = np.exp( -analytics.R_L(tau)-analytics.R_NLLc(tau) )
+    return partC*exponC
 
 def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=100000):
     x = torch.logspace(torch.log10(a), torch.log10(b), steps=num_steps, dtype=torch.float64)
@@ -201,6 +202,7 @@ if args.piece == 'nllc':
     optimizer = optim.Adam([{'params': lambda_2, 'lr': defrate}])
 
 bins = prep_integral_equation_2_direct(lambda_0, lambda_1, lambda_2, filtered_tau_i, n_samp,True)
+
 integral_equation_2_direct(lambda_0, lambda_1, lambda_2, bins, True)
 
 for step in range(1000000):
@@ -219,22 +221,26 @@ for step in range(1000000):
 
     print("Step {}, Loss: {}, Lambda 0: {}, Lambda 1: {}, Lambda 2: {}\r".format(step,loss.item(),lambda_0.item(),lambda_1.item(),lambda_2.item()), end='', flush=True)
 
-    if step >0 and step % (n_step+5) == 0:
-        #print(f"Step {step}, Loss: {loss.item()}, Lambda 0: {lambda_0.item()}, Lambda 1: {lambda_1.item()}, Lambda 2: {lambda_2.item()}")
-        n_samp = int(n_samp*samp_fac)
-        n_step = int(n_step/step_frac)
-        # print("n_step = ", n_step)
-        lambda_1_values.append(lambda_1.item())
-        lambda_2_values.append(lambda_2.item())
-        loss_values.append(loss.item())
-        n_samp_values.append(n_samp)
-    if n_step <= 5:
-        break
+    #if step >0 and step % (n_step+5) == 0:
+    #print(f"Step {step}, Loss: {loss.item()}, Lambda 0: {lambda_0.item()}, Lambda 1: {lambda_1.item()}, Lambda 2: {lambda_2.item()}")
+    n_samp = int(n_samp*samp_fac)
+    n_step = int(n_step/step_frac)
+    # print("n_step = ", n_step)
+    lambda_1_values.append(lambda_1.item())
+    lambda_2_values.append(lambda_2.item())
+    loss_values.append(loss.item())
+    n_samp_values.append(n_samp)
+    #if n_step <= 5:
+    #    break
 
-    # Save parameters if loss stops decreasing
-    if step > 0 and loss.item() < min_loss:
+    # Save parameters if loss doesn't change
+    if step > 0 and abs(loss.item() - loss_values[step-1]) < 1e-20:
         save_params(lambda_2.item(), asif)
         break
+    
+#    if step > 0 and loss.item() < min_loss:
+#        save_params(lambda_2.item(), asif)
+#        break
 
 print("")
 print(f"Final Lambda 0: {lambda_0.item()}, Final Lambda 1: {lambda_1.item()}, Final Lambda 2: {lambda_2.item()}")
