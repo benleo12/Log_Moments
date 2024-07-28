@@ -66,18 +66,18 @@ alpha_s = 0.118
 
 coeff = 2 * alpha_s / (3 * np.pi)
 
-alphas = [ AlphaS(91.1876,asif,0), AlphaS(91.1876,asif,0) ]
+alphas = [ AlphaS(91.1876,asif,0), AlphaS(91.1876,asif,1) ]
 analytics = nll_torch.NLL(alphas,a=1,b=1,t=91.1876**2)
 
 
 # Define wLL and wNLL functions
 def wLL(tau):
     if args.piece == 'll':  
-        partC = analytics.Rp(tau)/tau
-        exponC = np.exp(-analytics.R_L(tau))
+        partC = analytics.R_LLp(tau)/tau
+        exponC = np.exp(-analytics.R_LL(tau))
     else:
-        partC = (analytics.Rp(tau)+analytics.RNLLcp(tau))/tau
-        exponC = np.exp( -analytics.R_L(tau)-analytics.R_NLLc(tau) )
+        partC = (analytics.R_LLp(tau)+analytics.R_NLLcp(tau))/tau
+        exponC = np.exp( -analytics.R_LL(tau)-analytics.R_NLLc(tau) )
     return partC*exponC
 
 def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=100000):
@@ -157,17 +157,17 @@ def prep_integral_equation_2_direct(lambda_0,lambda_1, lambda_2, tau_i, n_samp,p
 
 def integral_equation_2_direct(lambda_0,lambda_1, lambda_2, bins,printit=False):
     integral = 0
-    RLLp = analytics.Rp(bins[0])
-    RNLLcp = analytics.RNLLcp(bins[0])
+    RLLp = analytics.R_LLp(bins[0])
+    RNLLcp = analytics.R_NLLcp(bins[0])
     if args.piece == 'll':
         part = (CLL*RLLp)/((CLL-lambda_1)*RLLp)
-        expon = torch.exp( -lambda_1*analytics.R_L(bins[0]) )
+        expon = torch.exp( -lambda_1*analytics.R_LL(bins[0]) )
     if args.piece == 'nllc':
         part = (CLL*RLLp + CNLLc*RNLLcp)/((CLL-lambda_1)*RLLp + (CNLLc-lambda_2)*RNLLcp)
-        expon = torch.exp( -lambda_1*analytics.R_L(bins[0])-lambda_2*analytics.R_NLLc(bins[0]) )
+        expon = torch.exp( -lambda_1*analytics.R_LL(bins[0])-lambda_2*analytics.R_NLLc(bins[0]) )
     vals = torch.sum(part*expon,1)/bins[3]
-    anas  = np.exp( -analytics.R_L(bins[2])-analytics.R_NLLc(bins[2]) )
-    anas -= np.exp( -analytics.R_L(bins[1])-analytics.R_NLLc(bins[1]) )
+    anas  = np.exp( -analytics.R_LL(bins[2])-analytics.R_NLLc(bins[2]) )
+    anas -= np.exp( -analytics.R_LL(bins[1])-analytics.R_NLLc(bins[1]) )
     integral = sum((vals-anas)**2)
     if printit:
         print('Integral is',integral.item(),'at',lambda_1.item(),lambda_2.item())
@@ -215,7 +215,7 @@ print("min/max",min_tau,max_tau)
 filtered_tau_i = tau_i[(tau_i >= min_tau) & (tau_i <= max_tau)]
 
 CN    = torch_quad(wLL, min_tau, max_tau)
-CLL   = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_L)
+CLL   = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_LL)
 CNLLc = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_NLLc)
 
 print("CN    =",CN)
