@@ -11,13 +11,14 @@ class Kernel:
     def __init__(self,flavs,Ca,alpha,t0):
         self.flavs = flavs
         self.Ca = Ca
-        self.alphamax=alpha(t0)
+        self.alphamax=alpha[1](t0)
         self.alpha=alpha
 
 class Soft (Kernel):
 
     def Value(self,z,k2,t):
-        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2)-2)*(1+self.alpha(t)/(2*m.pi)*K)/(z[0]+z[1])
+        asrat = self.alpha[1](t)/self.alpha[0](t)
+        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2)-2)*(1+asrat*self.alpha[0](t)/(2*m.pi)*K)/(z[0]+z[1])
     def Estimate(self,z,k02):
         return self.Ca*2*(-z[1])/(z[1]*z[1]+k02)*(1+self.alphamax/(2*m.pi)*K)
     def Integral(self,k02):
@@ -80,14 +81,14 @@ class Shower:
             self.alphamax = (2*m.pi)/self.alpha.beta0(5)
         self.kernels = {}
         for fl in [-5,-4,-3,-2,-1,1,2,3,4,5]:
-            self.kernels[fl] = [ Soft([fl,fl,21],CA/2 if lc else CF,alpha[1],self.t0) ]
-        self.kernels[21] = [ Soft([21,21,21],CA/2,alpha[1],self.t0) ]
+            self.kernels[fl] = [ Soft([fl,fl,21],CA/2 if lc else CF,alpha,self.t0) ]
+        self.kernels[21] = [ Soft([21,21,21],CA/2,alpha,self.t0) ]
         if coll & 1:
             for fl in [-5,-4,-3,-2,-1,1,2,3,4,5]:
-                self.kernels[fl].append( Cqq([fl,fl,21],CA/2 if lc else CF,alpha[1],self.t0) )
+                self.kernels[fl].append( Cqq([fl,fl,21],CA/2 if lc else CF,alpha,self.t0) )
         if coll & 2:
-            self.kernels[21].append( Cgg([21,21,21],CA/2,alpha[1],self.t0) )
-            self.kernels[21].append( Cgq([21,0,0],0,alpha[1],self.t0) )
+            self.kernels[21].append( Cgg([21,21,21],CA/2,alpha,self.t0) )
+            self.kernels[21].append( Cgq([21,0,0],0,alpha,self.t0) )
         self.Ca = CA/2 if lc else CF
         self.Bl = -3./4. if coll&1 else -1.
 
@@ -181,7 +182,7 @@ class Shower:
             asref = self.alpha.asa(t,5)
             if asref>0: w = self.alpha(kt**2,5)/asref
             else: w = 0
-        w *= s[2].Value(z,kt**2/s[3],kt**2)/s[2].Estimate(z,self.ct0/s[3])
+        w *= s[2].Value(z,kt**2/s[3],kt**2)/s[2].Estimate(z,self.ct0/s[3])/(1-y)
         w *= 1/(1+self.beta)
         if w <= rng.random(): return False
         phi = 2*m.pi*rng.random()
