@@ -90,13 +90,11 @@ class NLL:
             (self.r(self.as0,self.b0,self.b1,self.K,self.a,self.b,L)+\
              self.Bl*self.T(self.as0,self.b0,L/(self.a+self.b)))
 
-    def lr1pp(self,as0,b0,a,b,L):
-        l = as0*b0*L
-        return 2*as0/m.pi/((a-2*l)*(a+b-2*l))
-
     def R_Lpp(self,v):
         L = m.log(1./v)
-        return 2.*CF*self.lr1pp(self.as0,self.b0,self.a,self.b,L)
+        return 2.*CF*\
+            (self.Tp(self.as0,self.b0,L/self.a)/self.a
+             -self.Tp(self.as0,self.b0,L/(self.a+self.b))/(self.a+self.b))
 
     def logF(self,v):
         rp = self.R_Lp(v)
