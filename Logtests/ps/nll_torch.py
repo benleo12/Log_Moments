@@ -9,7 +9,7 @@ from qcd import AlphaS, NC, TR, CA, CF
 
 class NLL:
 
-    def __init__(self,alpha,a,b,t):
+    def __init__(self,alpha,a,b,t,piece):
         self.alpha = alpha
         self.a = a
         self.b = b
@@ -17,8 +17,18 @@ class NLL:
         self.b0 = self.alpha[0].beta0(5)/(2.*m.pi)
         self.b1 = self.alpha[1].beta1(5)/pow(2.*m.pi,2)
         self.K = (67./18.-pow(m.pi,2)/6.)*CA-10./9.*TR*5
-        self.Bl = 0 # -3./4.
+        self.Bl = -3./4.
         self.nf = 5
+        if piece == 'll':
+            self.K = 0
+            self.F = 0
+            self.Bl = 0
+            self.b1 = 0
+        elif piece == 'nllc':
+            self.F = 0
+            self.Bl = 0
+        elif piece == 'nll1':
+            self.F = 0
 
     def T(self,as0,b0,L):
         l = as0*b0*L
@@ -73,14 +83,6 @@ class NLL:
             (self.r2p(self.as0,self.b0,self.b1,self.K,self.a,self.b,L)+
              self.Bl*self.Tp(self.as0,self.b0,L/(self.a+self.b))/(self.a+self.b))
 
-    def R_NLLc(self,v):
-        L = m.log(1./v)
-        return 2.*CF*self.r2(self.as0,self.b0,self.b1,self.K,self.a,self.b,L)
-
-    def R_NLLcp(self,v):
-        L = m.log(1./v)
-        return 2.*CF*self.r2p(self.as0,self.b0,self.b1,self.K,self.a,self.b,L)
-
     def r(self,as0,b0,b1,K,a,b,L):
         return L*self.r1(as0,b0,a,b,L)+self.r2(as0,b0,b1,K,a,b,L)
 
@@ -97,18 +99,13 @@ class NLL:
              -self.Tp(self.as0,self.b0,L/(self.a+self.b))/(self.a+self.b))
 
     def logF(self,v):
+        if self.F == 0: return 1
         rp = self.R_Lp(v)
         ge = 0.5772156649015329
         return -ge*rp - m.lgamma(1.+rp)
 
-    def Fp(self,v):
-        rp = self.R_Lp(v)
-        rpp = self.R_Lpp(v)
-        ge = 0.5772156649015329
-        F = m.exp(self.logF(v))
-        return -F*(ge + sp.digamma(1 + rp))*rpp
-
     def FpF(self,v):
+        if self.F == 0: return 1
         rp = self.R_Lp(v)
         rpp = self.R_Lpp(v)
         ge = 0.5772156649015329

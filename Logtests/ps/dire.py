@@ -336,18 +336,19 @@ if __name__== "__main__":
 
     if opts.piece == 'll':
         K=0
+        opts.nem=1
         opts.coll=0
         opts.order=0
-        alphas = [ AlphaS(ecms,mn(opts.alphas),0),
-                   AlphaS(ecms,mn(opts.alphas),0) ]
-    if opts.piece == 'nllc':
+    elif opts.piece == 'nllc':
+        opts.nem=1
         opts.coll=0
         opts.order=1
-        alphas = [ AlphaS(ecms,mn(opts.alphas),1),
-                   AlphaS(ecms,mn(opts.alphas),0) ]
-    else:
-        alphas = [ AlphaS(ecms,mn(opts.alphas),int(opts.order)),
-                   AlphaS(ecms,mn(opts.alphas),int(opts.order)) ]
+    elif opts.piece == 'nll1':
+        opts.nem=1
+        opts.order=1
+
+    alphas = [ AlphaS(ecms,mn(opts.alphas),int(opts.order)),
+               AlphaS(ecms,mn(opts.alphas),0) ]
 
     print("t_0 = {0}, log(Q^2/t_0) = {1}, \\alpha_s(t_0) = {2} / {3}". \
           format(t0,mylog(ecms**2/t0),alphas[0](t0),alphas[1](t0)))

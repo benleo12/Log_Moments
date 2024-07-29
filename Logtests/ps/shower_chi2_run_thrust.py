@@ -62,17 +62,13 @@ torch.set_num_threads(4)
 torch.set_num_interop_threads(4)
 
 alphas = [ AlphaS(91.1876,asif,0), AlphaS(91.1876,asif,1) ]
-analytics = nll_torch.NLL(alphas,a=1,b=1,t=91.1876**2)
+analytics = nll_torch.NLL(alphas,a=1,b=1,t=91.1876**2,piece=args.piece)
 
 
 # Define wLL and wNLL functions
 def wLL(tau):
-    if args.piece == 'll':  
-        partC = analytics.R_LLp(tau)/tau
-        exponC = np.exp(-analytics.R_LL(tau))
-    else:
-        partC = (analytics.R_LLp(tau)+analytics.R_NLLcp(tau))/tau
-        exponC = np.exp( -analytics.R_LL(tau)-analytics.R_NLLc(tau) )
+    partC = (analytics.R_LLp(tau)+analytics.R_NLLp(tau))/tau
+    exponC = np.exp( -analytics.R_LL(tau)-analytics.R_NLL(tau) )
     return partC*exponC
 
 def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=100000):
@@ -90,7 +86,7 @@ def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=100000):
 def run_pypy_script(pypy_script_path,asif,n_samp,piece):
     """Runs the PyPy script with specified flags that generates the CSV file."""
     # Define the additional flags as a list
-    flags = ['-e',str(n_samp),'-A',str(asif),'-n','1','-b','1','-C','1','-x',str(piece)]
+    flags = ['-e',str(n_samp),'-A',str(asif),'-b','1','-C','1','-x',str(piece)]
 
     # Create the filename based on flags and ensure it includes "LL"
     filename = f"thrust_e{n_samp}_A{asif}_{args.piece}.csv"
@@ -153,16 +149,12 @@ def prep_integral_equation_2_direct(lambda_0,lambda_1, lambda_2, tau_i, n_samp,p
 def integral_equation_2_direct(lambda_0,lambda_1, lambda_2, bins,printit=False):
     integral = 0
     RLLp = analytics.R_LLp(bins[0])
-    RNLLcp = analytics.R_NLLcp(bins[0])
-    if args.piece == 'll':
-        part = (CLL*RLLp)/((CLL-lambda_1)*RLLp)
-        expon = torch.exp( -lambda_1*analytics.R_LL(bins[0]) )
-    if args.piece == 'nllc':
-        part = (CLL*RLLp + CNLLc*RNLLcp)/((CLL-lambda_1)*RLLp + (CNLLc-lambda_2)*RNLLcp)
-        expon = torch.exp( -lambda_1*analytics.R_LL(bins[0])-lambda_2*analytics.R_NLLc(bins[0]) )
+    RNLLp = analytics.R_NLLp(bins[0])
+    part = (CLL*RLLp + CNLL*RNLLp)/((CLL-lambda_1)*RLLp + (CNLL-lambda_2)*RNLLp)
+    expon = torch.exp( -lambda_1*analytics.R_LL(bins[0])-lambda_2*analytics.R_NLL(bins[0]) )
     vals = torch.sum(part*expon,1)/bins[3]
-    anas  = np.exp( -analytics.R_LL(bins[2])-analytics.R_NLLc(bins[2]) )
-    anas -= np.exp( -analytics.R_LL(bins[1])-analytics.R_NLLc(bins[1]) )
+    anas  = np.exp( -analytics.R_LL(bins[2])-analytics.R_NLL(bins[2]) )
+    anas -= np.exp( -analytics.R_LL(bins[1])-analytics.R_NLL(bins[1]) )
     integral = sum((vals-anas)**2)
     if printit:
         print('\\Chi^2 is',integral.item(),'at',lambda_1.item(),lambda_2.item())
@@ -209,19 +201,19 @@ print("Tau min/max: ",min_tau.item(),max_tau.item())
 
 filtered_tau_i = tau_i[(tau_i >= min_tau) & (tau_i <= max_tau)]
 
-CN    = torch_quad(wLL, min_tau, max_tau)
-CLL   = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_LL)
-CNLLc = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_NLLc)
+CN   = torch_quad(wLL, min_tau, max_tau)
+CLL  = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_LL)
+CNLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_NLL)
 
-print("CN    =",CN)
-print("CLL   =",CLL)
-print("CNLLc =",CNLLc)
+print("CN   =",CN)
+print("CLL  =",CLL)
+print("CNLL =",CNLL)
 
 # Define the optimizer
 defrate = 0.01
 if args.piece == 'll':
     optimizer = optim.Adam([{'params': lambda_1, 'lr': defrate}])
-if args.piece == 'nllc':
+if args.piece == 'nllc' or args.piece == 'nll1':
     optimizer = optim.Adam([{'params': lambda_2, 'lr': defrate}])
 
 bins = prep_integral_equation_2_direct(lambda_0, lambda_1, lambda_2, filtered_tau_i, n_samp,True)
