@@ -61,11 +61,6 @@ torch.set_num_threads(4)
 # Set the number of threads used for inter-op parallelism
 torch.set_num_interop_threads(4)
 
-# Assuming alpha_s is a known constant
-alpha_s = 0.118
-
-coeff = 2 * alpha_s / (3 * np.pi)
-
 alphas = [ AlphaS(91.1876,asif,0), AlphaS(91.1876,asif,1) ]
 analytics = nll_torch.NLL(alphas,a=1,b=1,t=91.1876**2)
 
@@ -170,7 +165,7 @@ def integral_equation_2_direct(lambda_0,lambda_1, lambda_2, bins,printit=False):
     anas -= np.exp( -analytics.R_LL(bins[1])-analytics.R_NLLc(bins[1]) )
     integral = sum((vals-anas)**2)
     if printit:
-        print('Integral is',integral.item(),'at',lambda_1.item(),lambda_2.item())
+        print('\\Chi^2 is',integral.item(),'at',lambda_1.item(),lambda_2.item())
     return integral
 
 # Initialize the Lagrange multipliers
@@ -204,13 +199,13 @@ else:
     raise RuntimeError("Data generation failed. Exiting.")
 
 filtered_tau_0 = tau_i[(tau_i != 0.0)]
-print("zero taus = ", len(filtered_tau_0))
+print("Nonzero tau values: ", len(filtered_tau_0))
 
 # Now you can use min_tau and peak_tau in your further calculations
 min_tau = torch.min(filtered_tau_0)
 max_tau = torch.max(filtered_tau_0)
 
-print("min/max",min_tau,max_tau)
+print("Tau min/max: ",min_tau.item(),max_tau.item())
 
 filtered_tau_i = tau_i[(tau_i >= min_tau) & (tau_i <= max_tau)]
 

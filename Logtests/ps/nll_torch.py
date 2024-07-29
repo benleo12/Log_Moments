@@ -57,8 +57,8 @@ class NLL:
     def r2p(self,as0,b0,b1,K,a,b,L):
         l = as0*b0*L
         return 2.*as0/m.pi*\
-            (self.K*l/(2*m.pi*b0)/(a-2*l)/(a+b-2*l)\
-             -self.b1/(2*b*b0**2*(a-2*l)*(a+b-2*l))*\
+            (K*l/(2*m.pi*b0)/(a-2*l)/(a+b-2*l)\
+             -b1/(2*b*b0**2*(a-2*l)*(a+b-2*l))*\
              (a*(a+b-2*l)*m.log(1.-2*l/a)-(a+b)*(a-2*l)*m.log(1-2*l/(a+b))+2*b*l))
 
     def R_NLL(self,v):
