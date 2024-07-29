@@ -18,7 +18,7 @@ class Soft (Kernel):
 
     def Value(self,z,k2,t):
         asrat = self.alpha[1](t)/self.alpha[0](t)
-        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2)-2)*(1+asrat*self.alpha[0](t)/(2*m.pi)*K)/(z[0]+z[1])
+        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2))*(1+asrat*self.alpha[0](t)/(2*m.pi)*K)
     def Estimate(self,z,k02):
         return self.Ca*2*(-z[1])/(z[1]*z[1]+k02)*(1+self.alphamax/(2*m.pi)*K)
     def Integral(self,k02):
@@ -29,7 +29,7 @@ class Soft (Kernel):
 class Cqq (Kernel):
 
     def Value(self,z,k2,t):
-        return self.Ca*(1-z[1])*0
+        return self.Ca*(-2+1-z[1])
     def Estimate(self,z,k02):
         return self.Ca
     def Integral(self,k02):
@@ -40,7 +40,7 @@ class Cqq (Kernel):
 class Cgg (Kernel):
 
     def Value(self,z,k2,t):
-        return self.Ca*z[1]*(1-z[1])*0
+        return self.Ca*(-2+z[1]*(1-z[1]))
     def Estimate(self,z,k02):
         return self.Ca
     def Integral(self,k02):
@@ -51,7 +51,7 @@ class Cgg (Kernel):
 class Cgq (Kernel):
 
     def Value(self,z,k2,t):
-        return TR/2*(1-2*z[1]*(1-z[1]))*0
+        return TR/2*(1-2*z[1]*(1-z[1]))
     def Estimate(self,z,k02):
         return TR/2
     def Integral(self,k02):
