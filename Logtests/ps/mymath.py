@@ -6,6 +6,7 @@ if not config.quad_precision:
     def nm(v): return float(v)
     def myexp(a): return m.exp(a)
     def mylog(a): return m.log(a)
+    def mylog10(a): return m.log10(a)
     def mypow(a,b): return m.pow(a,b)
     def mysqrt(a): return m.sqrt(a)
     def mysin(y): return m.sin(y)
@@ -20,6 +21,7 @@ elif config.quad_precision >= 2:
     config.kin_epsilon = mn('1e-{0}'.format(64*(2**(config.quad_precision-2))))
     def myexp(a): return m.exp(a)
     def mylog(a): return m.log(a)
+    def mylog10(a): return m.log10(a)
     def mypow(a,b): return m.power(a,b)
     def mysqrt(a): return m.sqrt(a)
     def mysin(y): return m.sin(y)
@@ -38,6 +40,7 @@ else:
     config.kin_epsilon = mn('1e-28')
     def myexp(a): return a.exp()
     def mylog(a): return a.log()
+    def mylog10(a): return a.log10()
     def mypow(a,b): return (a.log()*b).exp()
     def mysqrt(x): return x.sqrt()
     CCSin = [ mn('1.276278962402265880207636972086138'),

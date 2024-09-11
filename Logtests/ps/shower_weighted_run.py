@@ -19,19 +19,23 @@ class Kernel:
 
 class Soft (Kernel):
 
-    def Value(self,z,k2,t):
+    def Value(self,z,y,t):
         asrat = self.alpha[1](t)/self.alpha[0](t)
-        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2))*(1+asrat*self.alpha[0](t)/(2*m.pi)*K)
+        if -z[1]/y < 1: return 0.
+        return self.Ca*2./(-z[1])*(1+asrat*self.alpha[0](t)/(2*m.pi)*K)
     def Estimate(self,z,k02):
-        return self.Ca*2*(-z[1])/(z[1]*z[1]+k02)*(1+self.alphamax/(2*m.pi)*K)
+        return self.Ca*2./(-z[1])*(1+self.alphamax/(2*m.pi)*K)
     def Integral(self,k02):
-        return self.Ca*mylog(1+1/k02)*(1+self.alphamax/(2*m.pi)*K)
+        if k02>0.25: return 0.;
+        eps=2.*k02/(1.+mysqrt(1.-4.*k02))
+        return self.Ca*2.*mylog((1.-eps)/eps)*(1+self.alphamax/(2*m.pi)*K)
     def GenerateZ(self,k02):
-        return [mn(1),-mysqrt(k02*(mypow(1+1/k02,mn(rng.random()))-1))]
+        eps=2.*k02/(1.+mysqrt(1.-4.*k02))
+        return [mn(1),-eps*mypow((1.-eps)/eps,r.random())]
 
 class Cqq (Kernel):
 
-    def Value(self,z,k2,t):
+    def Value(self,z,y,t):
         return self.Ca*(-2+1-z[1])
     def Estimate(self,z,k02):
         return self.Ca
@@ -42,7 +46,7 @@ class Cqq (Kernel):
 
 class Cgg (Kernel):
 
-    def Value(self,z,k2,t):
+    def Value(self,z,y,t):
         return self.Ca*(-2+z[1]*(1-z[1]))
     def Estimate(self,z,k02):
         return self.Ca
@@ -53,7 +57,7 @@ class Cgg (Kernel):
 
 class Cgq (Kernel):
 
-    def Value(self,z,k2,t):
+    def Value(self,z,y,t):
         return TR/2*(1-2*z[1]*(1-z[1]))
     def Estimate(self,z,k02):
         return TR/2
@@ -170,14 +174,8 @@ class Shower:
         z = s[2].GenerateZ(self.ct0/s[3])
         omz = 1-z[1] if z[0] == 0 else -z[1]
         if omz == 0: return False
-        Q2, sijt = momsum.M2(), 2*s[0].mom.SmallMLDP(s[1].mom)
-        sit, sjt = 2*momsum*s[0].mom, 2*momsum*s[1].mom
-        if sijt <= 0 or sit >= 0 or sjt >= 0: return False
-        v, rho = mysqrt(t/Q2), mypow(sit*sjt/(Q2*sijt),self.beta/2)
-        Q, a, b = mysqrt(sijt/Q2*sit/sjt), 1, self.beta
-        kt = mysqrt(Q2)*mypow(rho*v,a/(a+b))*mypow(Q*omz,b/(a+b))
-        y = kt**2/s[3]/omz
-        x = [ z[0], (z[1]-y)/(1-y) if z[0] == 0 else z[1]/(1-y) ]
+        kt, Q, a, b = mysqrt(t), mysqrt(s[3]), 1, self.beta
+        y = mypow(kt/Q,2/(a+b))*mypow(omz,(b-a)/(a+b))#t/s[3]/omz
         if y <= 0 or y >= 1: return False
         if self.amode == 0:
             w = self.alpha(kt**2,5)/self.alphamax
@@ -185,13 +183,11 @@ class Shower:
             asref = self.alpha.asa(t,5)
             if asref>0: w = self.alpha(kt**2,5)/asref
             else: w = 0
-        w *= s[2].Value(z,kt**2/s[3],kt**2)/s[2].Estimate(z,self.ct0/s[3])/(1-y)
+        w *= s[2].Value(z,y,kt**2)/s[2].Estimate(z,self.ct0/s[3])
         w *= 1/(1+self.beta)
-        if w > 1.0:
-            print(w)
-        #if w <= rng.random(): return False
+        if w <= rng.random(): return False
         phi = 2*m.pi*rng.random()
-        moms = self.MakeKinematics(x,y,phi,s[0].mom,s[1].mom)
+        moms = self.MakeKinematics(z,y,phi,s[0].mom,s[1].mom)
         if moms == []: return False
         cps = []
         for cp in s[0].cps:
@@ -387,11 +383,11 @@ thrust_values = jetrat.Finalize()
 import matplotlib.pyplot as plt
 from scipy.integrate import quad
 # Integration range
-min_tau = 10**-3.0#10
+min_tau = min([ i if i>0. else 1. for i in thrust_values ])
 max_tau = 0.999#0.1
 #coeff = 2 * alpha_s / (3 * np.pi)
 
-alphas = [ AlphaS(91.1876,0.118,0), AlphaS(91.1876,0.118,1) ]
+alphas = [ AlphaS(91.1876,mn(opts.alphas),0), AlphaS(91.1876,mn(opts.alphas),1) ]
 analytics = nll.NLL(alphas,a=1,b=1,t=91.1876**2)
 
 
@@ -521,7 +517,7 @@ def export_interpolated_histogram(bin_centers, interp_values, filename):
 
 # After calculating theoretical distributions
 # Generate tau values, avoiding 0 to prevent division by zero or log(0)
-tau_values = np.logspace(-3.0, -0.001, 10000)  # Upper limit set to 0.5 for better visualization
+tau_values = np.logspace(mylog10(min_tau), -0.001, 10000)  # Upper limit set to 0.5 for better visualization
 
 # Calculate theoretical probability densities
 pLL_values = wLL(tau_values)
@@ -540,7 +536,7 @@ export_thrust_data(thrust_values, weights, 'simulated_thrust.csv')
 
 # After calculating interpolated histogram data
 # Bin thrust values for interpolation
-linbins = np.linspace(-5.0, -0.001, num=100)
+linbins = np.linspace(mylog10(min_tau), -0.001, num=100)
 hist_vals, bin_edges = np.histogram(np.log10(np.maximum(thrust_values, 1e-10)), bins=linbins, density=True)
 
 # Find the bin centers
