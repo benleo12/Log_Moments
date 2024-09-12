@@ -16,19 +16,22 @@ class Kernel:
 
 class Soft (Kernel):
 
-    def Value(self,z,k2,t):
-        asrat = self.alpha[1](t)/self.alpha[0](t)
-        return self.Ca*(2*(-z[1])/(z[1]*z[1]+k2))*(1+asrat*self.alpha[0](t)/(2*m.pi)*K)
+    def Value(self,z,y,t):
+        if -z[1]/y < 1: return 0.
+        return self.Ca*2./(-z[1])*(1+self.alpha[1](t)/(2*m.pi)*K)
     def Estimate(self,z,k02):
-        return self.Ca*2*(-z[1])/(z[1]*z[1]+k02)*(1+self.alphamax/(2*m.pi)*K)
+        return self.Ca*2./(-z[1])*(1+self.alphamax/(2*m.pi)*K)
     def Integral(self,k02):
-        return self.Ca*mylog(1+1/k02)*(1+self.alphamax/(2*m.pi)*K)
+        if k02>0.25: return 0.;
+        eps=2.*k02/(1.+mysqrt(1.-4.*k02))
+        return self.Ca*2.*mylog((1.-eps)/eps)*(1+self.alphamax/(2*m.pi)*K)
     def GenerateZ(self,k02):
-        return [mn(1),-mysqrt(k02*(mypow(1+1/k02,mn(rng.random()))-1))]
+        eps=2.*k02/(1.+mysqrt(1.-4.*k02))
+        return [mn(1),-eps*mypow((1.-eps)/eps,rng.random())]
 
 class Cqq (Kernel):
 
-    def Value(self,z,k2,t):
+    def Value(self,z,y,t):
         return self.Ca*(-2+1-z[1])
     def Estimate(self,z,k02):
         return self.Ca
@@ -39,7 +42,7 @@ class Cqq (Kernel):
 
 class Cgg (Kernel):
 
-    def Value(self,z,k2,t):
+    def Value(self,z,y,t):
         return self.Ca*(-2+z[1]*(1-z[1]))
     def Estimate(self,z,k02):
         return self.Ca
@@ -50,7 +53,7 @@ class Cgg (Kernel):
 
 class Cgq (Kernel):
 
-    def Value(self,z,k2,t):
+    def Value(self,z,y,t):
         return TR/2*(1-2*z[1]*(1-z[1]))
     def Estimate(self,z,k02):
         return TR/2
@@ -174,19 +177,18 @@ class Shower:
         Q, a, b = mysqrt(sijt/Q2*sit/sjt), 1, self.beta
         kt = mysqrt(Q2)*mypow(rho*v,a/(a+b))*mypow(Q*omz,b/(a+b))
         y = kt**2/s[3]/omz
-        x = [ z[0], (z[1]-y)/(1-y) if z[0] == 0 else z[1]/(1-y) ]
-        if y <= 0 or y >= 1: return False
+        if y <= 0 or y >= 1 or kt**2<self.ct0: return False
         if self.amode == 0:
             w = self.alpha(kt**2,5)/self.alphamax
         else:
             asref = self.alpha.asa(t,5)
             if asref>0: w = self.alpha(kt**2,5)/asref
             else: w = 0
-        w *= s[2].Value(z,kt**2/s[3],kt**2)/s[2].Estimate(z,self.ct0/s[3])/(1-y)
+        w *= s[2].Value(z,y,kt**2)/s[2].Estimate(z,self.ct0/s[3])
         w *= 1/(1+self.beta)
         if w <= rng.random(): return False
         phi = 2*m.pi*rng.random()
-        moms = self.MakeKinematics(x,y,phi,s[0].mom,s[1].mom)
+        moms = self.MakeKinematics(z,y,phi,s[0].mom,s[1].mom)
         if moms == []: return False
         cps = []
         for cp in s[0].cps:

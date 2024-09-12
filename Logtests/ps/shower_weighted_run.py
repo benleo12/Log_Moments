@@ -8,7 +8,7 @@ import numpy as np
 from mymath import *
 
 K = (67./18.-pow(m.pi,2)/6.)*CA-10./9.*TR*5
-#K = 0.0 
+
 class Kernel:
 
     def __init__(self,flavs,Ca,alpha,t0):
@@ -174,8 +174,13 @@ class Shower:
         z = s[2].GenerateZ(self.ct0/s[3])
         omz = 1-z[1] if z[0] == 0 else -z[1]
         if omz == 0: return False
-        kt, Q, a, b = mysqrt(t), mysqrt(s[3]), 1, self.beta
-        y = mypow(kt/Q,2/(a+b))*mypow(omz,(b-a)/(a+b))#t/s[3]/omz
+        Q2, sijt = momsum.M2(), 2*s[0].mom.SmallMLDP(s[1].mom)
+        sit, sjt = 2*momsum*s[0].mom, 2*momsum*s[1].mom
+        if sijt <= 0 or sit >= 0 or sjt >= 0: return False
+        v, rho = mysqrt(t/Q2), mypow(sit*sjt/(Q2*sijt),self.beta/2)
+        Q, a, b = mysqrt(sijt/Q2*sit/sjt), 1, self.beta
+        kt = mysqrt(Q2)*mypow(rho*v,a/(a+b))*mypow(Q*omz,b/(a+b))
+        y = kt**2/s[3]/omz
         if y <= 0 or y >= 1: return False
         if self.amode == 0:
             w = self.alpha(kt**2,5)/self.alphamax
@@ -285,7 +290,6 @@ class Shower:
         while self.t > self.ct0:
             if em >= nem: return
             self.GeneratePoint(event)
-            return
             if em == 0 and self.rt0 != 0:
                 self.ct0 = max(self.t0,self.t*self.rt0)
             em += 1
@@ -388,7 +392,7 @@ max_tau = 0.999#0.1
 #coeff = 2 * alpha_s / (3 * np.pi)
 
 alphas = [ AlphaS(91.1876,mn(opts.alphas),0), AlphaS(91.1876,mn(opts.alphas),1) ]
-analytics = nll.NLL(alphas,a=1,b=1,t=91.1876**2)
+analytics = nll.NLL(alphas,a=1,b=1,t=91.1876**2,piece='nllc')
 
 
 # Define wLL and wNLL functions
@@ -406,8 +410,8 @@ def wLL(tau_values):
 
     results = []
     for tau in tau_values:
-        partC = (analytics.Rp(tau)) / tau
-        exponC = np.exp(-analytics.R_L(tau))
+        partC = (analytics.R_LLp(tau)) / tau
+        exponC = np.exp(-analytics.R_LL(tau))
 #        partC = ((analytics.RNNLLp(tau)-analytics.FpF(tau)))/tau
 #        exponC = np.exp( - (analytics.R_SL(tau)-analytics.logF(tau)) )
         results.append(partC * exponC)
@@ -429,8 +433,8 @@ def wNLL(tau_values):
 
     results = []
     for tau in tau_values:
-        partC = (analytics.Rp(tau) + (analytics.RNNLLp(tau)))/tau
-        exponC = np.exp( -(analytics.R_SL(tau)) -  analytics.R_L(tau))
+        partC = (analytics.R_LLp(tau) + (analytics.R_NLLp(tau)))/tau
+        exponC = np.exp( -(analytics.R_NLL(tau)) -  analytics.R_LL(tau))
         results.append(partC*exponC)
     return np.array(results)
 
@@ -446,8 +450,8 @@ CLL1, _ = quad(lambda t: wLL(t) * np.log(t), min_tau, max_tau)
 CLL2, _ = quad(lambda t: wLL(t) * np.log(t)**2, min_tau, max_tau)
 
 CNLL0, _ = quad(lambda t: wNLL(t), min_tau, max_tau)
-CNLL1, _ = quad(lambda t: wNLL(t) * ((analytics.R_SL(t))), min_tau, max_tau)
-CNLL2, _ = quad(lambda t: wNLL(t) * (analytics.R_L(t)), min_tau, max_tau)
+CNLL1, _ = quad(lambda t: wNLL(t) * ((analytics.R_NLL(t))), min_tau, max_tau)
+CNLL2, _ = quad(lambda t: wNLL(t) * (analytics.R_LL(t)), min_tau, max_tau)
 
 
 #lambda_0 = 0.281920760869
