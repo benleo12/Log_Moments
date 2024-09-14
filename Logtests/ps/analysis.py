@@ -9,6 +9,7 @@ class SimplifiedAnalysis:
     def __init__(self, lam):
         self.lam = lam / 2
         self.thrust_values = []  # List to store thrust values directly
+        self.weight_values = []
 
     def logcut(self, v, cut):
         if v == 0 or v < myexp(cut): return 1
@@ -17,20 +18,12 @@ class SimplifiedAnalysis:
     def Analyze(self, event, w):
         hems = Hemispheres(event[2:])
         thrust = hems.Tau()
+        if thrust<=0.0: return
         self.thrust_values.append(thrust)  # Store thrust value directly
+        self.weight_values.append(w)
 
     def Finalize(self):
-        #print("Finalizing analysis...")
-
-        # Filter out values of 0.0
-        filtered_thrust_values = [value for value in self.thrust_values if value != 0.0]
-
-        # Example: print or save the filtered thrust values
-        #print(filtered_thrust_values)
-
-        return filtered_thrust_values
-
-
+        return self.thrust_values, self.weight_values
 
 class Analysis:
 

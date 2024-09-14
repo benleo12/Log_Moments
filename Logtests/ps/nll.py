@@ -22,6 +22,8 @@ class NLL:
         self.b1 = self.alpha[1].beta1(5)/pow(2.*m.pi,2)
         self.K = (67./18.-pow(m.pi,2)/6.)*CA-10./9.*TR*5
         self.Bl = -3./4.
+        self.K *= config.Kfac
+        self.Bl *= config.Blfac
         self.nf = 5
         if piece == 'll':
             self.K = 0

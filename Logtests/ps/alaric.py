@@ -1,28 +1,46 @@
+import config
 from mymath import *
 
 from vector import Vec4, Rotation, LT
 from particle import Particle, CheckEvent
 from qcd import AlphaS, NC, TR, CA, CF
 
+K = (67./18.-pow(m.pi,2)/6.)*CA-10./9.*TR*5
+
+class Trial_Weight:
+
+    def __init__(self,f,g,h):
+        self.f = f
+        self.g = g
+        self.h = h
+    def MC(self):
+        return self.f/self.g
+    def Accept(self):
+        return self.g/self.h
+    def Reject(self):
+        return self.g/self.h*(self.h-self.f)/(self.g-self.f)
+
 class Soft:
 
-    def __init__(self,flavs,Ca):
+    def __init__(self,flavs,Ca,alpha,t0):
         self.flavs = flavs
         self.Ca = Ca
+        self.alphamax = alpha[1](t0)
+        self.alpha = alpha
 
-    def Value(self,z,pi,pj,pk,e):
+    def Value(self,z,pi,pj,pk,e,t):
         n = -pj-e[0]-e[1]
         sij = pi.SmallMLDP(pj)
         sik = pi.SmallMLDP(pk)
         skj = pk.SmallMLDP(pj)
         D = sij*(pk*n)+skj*(pi*n)
         if D == 0: return mn(0)
-        A = 2*sik*(pi*n)/D/(z[0]+z[1])
+        A = 2*sik*(pi*n)/D/(z[0]+z[1])*(1+self.alpha[1](t)/(2*m.pi)*K*config.Kfac)
         return self.Ca*A
     def Estimate(self,z,ip):
-        return self.Ca*4/(-z[1])
+        return self.Ca*4/(-z[1])*(1+self.alphamax/(2*m.pi)*K*config.Kfac)
     def Integral(self,ip):
-        return self.Ca*4*mylog(1/ip[-1])
+        return self.Ca*4*mylog(1/ip[-1])*(1+self.alphamax/(2*m.pi)*K*config.Kfac)
     def GenerateZ(self,ip):
         return [mn(1),-mypow(ip[-1],rng.random())]
 
@@ -34,30 +52,30 @@ class Coll:
 
 class Cqq (Coll):
 
-    def Value(self,z,pi,pj,pk,e):
-        return self.Ca*(1-z[1])*0
+    def Value(self,z,pi,pj,pk,e,t):
+        return self.Ca*(-2+1-z[1])*config.Blfac
     def Estimate(self,z,ip):
-        return self.Ca
+        return self.Ca*2.*config.Blfac
     def Integral(self,ip):
-        return self.Ca
+        return self.Ca*2.*config.Blfac
     def GenerateZ(self,ip):
         return [mn(0),mn(rng.random())]
 
 class Cgg (Coll):
 
-    def Value(self,z,pi,pj,pk,e):
-        return self.Ca*z[1]*(1-z[1])*0
+    def Value(self,z,pi,pj,pk,e,t):
+        return self.Ca*(-2+z[1]*(1-z[1]))
     def Estimate(self,z,ip):
-        return self.Ca
+        return self.Ca*2.
     def Integral(self,ip):
-        return self.Ca
+        return self.Ca*2.
     def GenerateZ(self,ip):
         return [mn(0),mn(rng.random())]
 
 class Cgq (Coll):
 
-    def Value(self,z,pi,pj,pk,e):
-        return TR/2*(1-2*z[1]*(1-z[1]))*0
+    def Value(self,z,pi,pj,pk,e,t):
+        return TR/2*(1-2*z[1]*(1-z[1]))
     def Estimate(self,z,ip):
         return TR/2
     def Integral(self,ip):
@@ -70,25 +88,21 @@ class Cgq (Coll):
 
 class Shower:
 
-    def __init__(self,alpha,t0,coll,beta,rt0,flat,nmax,lc):
+    def __init__(self,alpha,t0,coll,beta,rt0,nmax,lc):
+        self.oef = 3
         self.nmax = nmax
         self.t0 = t0
         self.rt0 = rt0
         self.beta = beta
-        if len(flat)!=2: self.flat = False
-        else:
-            self.flat = True
-            self.lmin = flat[0]
-            self.lmax = flat[1]
-        self.alpha = alpha
-        self.alphamax = alpha(self.t0)
+        self.alpha = alpha[0]
+        self.alphamax = alpha[0](self.t0)
         self.amode = 0 if self.alpha.order == -1 else 1
         if self.amode != 0:
             self.alphamax = (2*m.pi)/self.alpha.beta0(5)
         self.kernels = {}
         for fl in [-5,-4,-3,-2,-1,1,2,3,4,5]:
-            self.kernels[fl] = [ Soft([fl,fl,21],CA/2 if lc else CF)  ]
-        self.kernels[21] = [ Soft([21,21,21],CA/2) ]
+            self.kernels[fl] = [ Soft([fl,fl,21],CA/2 if lc else CF,alpha,self.t0)  ]
+        self.kernels[21] = [ Soft([21,21,21],CA/2,alpha,self.t0) ]
         if coll & 1:
             for fl in [-5,-4,-3,-2,-1,1,2,3,4,5]:
                 self.kernels[fl].append( Cqq([fl,fl,21],CA/2 if lc else CF) )
@@ -200,9 +214,14 @@ class Shower:
             asref = self.alpha.asa(t,5)
             if asref>0: w = self.alpha(kt**2,5)/asref
             else: w = 0
-        w *= s[2].Value(z,moms[0],moms[1],moms[2],moms[3])/s[2].Estimate(z,s[3])
-        w *= 1/(1+self.beta)
-        if w <= rng.random(): return False
+        f = w*s[2].Value(z,moms[0],moms[1],moms[2],moms[3],t)/(1+self.beta)
+        h = s[2].Estimate(z,s[3])
+        g = self.oef*f if f<0.0 else h
+        wgt = Trial_Weight(f,g,h)
+        if wgt.MC() <= rng.random():
+            s[0].AddWeight(0,t,wgt.Reject())
+            return False
+        s[0].AddWeight(0,t,wgt.Accept())
         for i, j in zip(event,evt): i.mom = j
         cols = self.MakeColors(s[2].flavs,s[0].col,s[1].col)
         event.append(Particle(s[2].flavs[2],moms[1],cols[1],len(event),[0,0]))
@@ -276,26 +295,19 @@ class Shower:
             if tt > t:
                 t = tt
                 s = self.SelectSplit(event,rng.random(),rng.random())
-            if len(event) == 4 and self.flat:
-                lmax = min(self.lmax,self.alpha(self.Q2,5)/2*mylog(mn(1)/16))
-                lmin = self.lmin
-                lam = lmax+(lmin-lmax)*rng.random()
-                t = self.Q2*myexp(lam/(self.alpha(self.Q2,5)/2))
-                self.weight *= (lmax-lmin)*2/self.alpha(self.Q2,5)
-                self.t = t
-                while True:
-                    if self.GenerateZ(event,momsum,s,t):
-                        self.weight *= self.dsigma(t/self.Q2)
-                        return
-                    s = self.SelectSplit(event,rng.random(),rng.random())
             self.t = t
             if self.t > self.ct0:
                 if self.GenerateZ(event,momsum,s,t): return
 
+    def AddWeight(self,event,t):
+        for parton in event:
+            parton.GetWeight(self.w,t)
+            parton.wgt = []
+
     def Run(self,event,nem):
         em = 0
         self.c = 2
-        self.weight = 1
+        self.w = [ 1. ]
         self.ct0 = self.t0
         self.Q2 = (event[0].mom+event[1].mom).M2()
         self.t = self.Q2
@@ -304,11 +316,15 @@ class Shower:
             self.gs.append([self.gs[-1][0],mn(0)])
             self.UpdateWeights(split,event)
         while self.t > self.ct0:
-            if em >= nem: return
+            if em >= nem:
+                self.AddWeight(event,self.t0)
+                return
             self.GeneratePoint(event)
+            self.AddWeight(event,self.t)
             if em == 0 and self.rt0 != 0:
                 self.ct0 = max(self.t0,self.t*self.rt0)
             em += 1
+        self.AddWeight(event,self.t0)
 
 
 if __name__== "__main__":
@@ -331,9 +347,8 @@ if __name__== "__main__":
     parser.add_option("-C","--cut",default=1,dest="cut")
     parser.add_option("-R","--rcut",default='0',dest="rcut")
     parser.add_option("-Q","--ecms",default='91.1876',dest="ecms")
-    parser.add_option("-F","--flat",default='[]',dest="flat")
     parser.add_option("-q","--quad",default=0,action="count",dest="quad")
-    parser.add_option("-K","--cluster",default=5,dest="cas")
+    parser.add_option("-k","--cluster",default=5,dest="cas")
     parser.add_option("-l","--logfile",default="",dest="logfile")
     (opts,args) = parser.parse_args()
 
@@ -358,7 +373,7 @@ if __name__== "__main__":
     print("t_0 = {0}, log(Q^2/t_0) = {1}, \\alpha_s(t_0) = {2}". \
           format(t0,mylog(ecms**2/t0),alphas(t0)))
     shower = Shower(alphas,t0,int(opts.coll),mn(opts.beta),
-                    mn(opts.rcut),eval(opts.flat),int(opts.nmax),opts.lc)
+                    mn(opts.rcut),int(opts.nmax),opts.lc)
     jetrat = SimplifiedAnalysis(-0.0033)
 
     rng.seed(int(opts.seed))
@@ -380,7 +395,7 @@ if __name__== "__main__":
                 sys.stdout.write('Event {n}\r'.format(n=i))
             sys.stdout.flush()
             if i/nout == 10: nout *= 10
-        jetrat.Analyze(event,weight*shower.weight)
+        jetrat.Analyze(event,weight*shower.w)
     thrust_values = jetrat.Finalize()
 
     import csv
