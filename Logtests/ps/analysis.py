@@ -20,7 +20,7 @@ class SimplifiedAnalysis:
         thrust = hems.Tau()
         if thrust<=0.0: return
         self.thrust_values.append(thrust)  # Store thrust value directly
-        self.weight_values.append(w)
+        self.weight_values.append(w[0])
 
     def Finalize(self):
         return self.thrust_values, self.weight_values

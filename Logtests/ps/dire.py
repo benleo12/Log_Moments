@@ -25,8 +25,8 @@ class Kernel:
     def __init__(self,flavs,Ca,alpha,t0):
         self.flavs = flavs
         self.Ca = Ca
-        self.alphamax=alpha[1](t0)
-        self.alpha=alpha
+        self.alphamax = alpha[1](t0)
+        self.alpha = alpha
 
 class Soft (Kernel):
 
@@ -327,6 +327,8 @@ if __name__== "__main__":
     parser.add_option("-k","--cluster",default=5,dest="cas")
     parser.add_option("-l","--logfile",default="",dest="logfile")
     parser.add_option("-x","--piece",default="all",dest="piece")
+    parser.add_option("-K","--Kfactor",default=1,dest="Kfac")
+    parser.add_option("-B","--Blfactor",default=1,dest="Blfac")
     (opts,args) = parser.parse_args()
 
     opts.histo = opts.histo.format(**vars(opts))
@@ -335,6 +337,8 @@ if __name__== "__main__":
 
     import config
     config.quad_precision = int(opts.quad)
+    config.Kfac = float(opts.Kfac)
+    config.Blfac = float(opts.Blfac)
     from mymath import *
     print_math_settings()
 
@@ -389,10 +393,14 @@ if __name__== "__main__":
             sys.stdout.flush()
             if i/nout == 10: nout *= 10
         jetrat.Analyze(event,weight*shower.w)
-    thrust_values = jetrat.Finalize()
+    thrust_values, weight_values = jetrat.Finalize()
 
     import csv
     with open('thrust_values.csv', 'w') as csvfile:
         writer = csv.writer(csvfile)
         for value in thrust_values:
+            writer.writerow([value])
+    with open('weight_values.csv', 'w') as csvfile:
+        writer = csv.writer(csvfile)
+        for value in weight_values:
             writer.writerow([value])
