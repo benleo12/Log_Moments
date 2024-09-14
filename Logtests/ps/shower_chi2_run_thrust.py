@@ -201,14 +201,14 @@ else:
     print("PyPy script execution failed.")
     raise RuntimeError("Data generation failed. Exiting.")
 
-min_tau = torch.min(tau_i)
-max_tau = torch.max(tau_i)
+min_tau = tau_i.min(dim=0).values[0]
+max_tau = tau_i.max(dim=0).values[0]
 
 print("Tau min/max: ",min_tau.item(),max_tau.item())
 
-CN   = torch_quad(wLL, min_tau, max_tau*0.999999999999)
-CLL  = torch_quad(wLL, min_tau, max_tau*0.999999999999, func_mul=analytics.R_LL)
-CNLL = torch_quad(wLL, min_tau, max_tau*0.999999999999, func_mul=analytics.R_NLL)
+CN   = torch_quad(wLL, min_tau, max_tau)
+CLL  = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_LL)
+CNLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_NLL)
 
 print("CN   =",CN)
 print("CLL  =",CLL)
