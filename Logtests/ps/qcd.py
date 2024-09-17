@@ -12,6 +12,7 @@ class AlphaS:
         self.order = order
         self.mz2 = mz*mz
         self.asmz = asmz
+        self.nf = 5
 #        if MPI.COMM_WORLD.Get_rank() == 0:
         print("\\alpha_s({0}) = {1}".format(mz,self(self.mz2)))
 
@@ -47,8 +48,9 @@ class AlphaS:
         w = 1+b0*asref*mylog(t/tref)
         return asref/w*(1-b1/b0*asref*mylog(w)/w)
 
-    def __call__(self,t,nf=5):
+    def __call__(self,t,nf=-1):
         if self.order == -1: return self.asmz
+        if nf == -1: nf = self.nf
         if self.order == 0: return self.as0(t,nf)
         return self.as1(t,nf)
 

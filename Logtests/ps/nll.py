@@ -5,6 +5,7 @@ if config.use_torch:
     m.pi = math.pi
 else:
     import math as m
+import torch
 import random as r
 import scipy.special as sp
 
@@ -24,7 +25,7 @@ class NLL:
         self.Bl = -3./4.
         self.K *= config.Kfac
         self.Bl *= config.Blfac
-        self.nf = 5
+        self.nf = alpha[0].nf
         if piece == 'll':
             self.K = 0
             self.F = 0
@@ -35,6 +36,11 @@ class NLL:
             self.Bl = 0
         elif piece == 'nll1':
             self.F = 0
+
+    def fuzzymin(self,v,maxv):
+        if isinstance(v,torch.Tensor):
+            return torch.clamp(v,max=0.999*maxv)
+        return min(v,0.999*maxv)
 
     def T(self,as0,b0,L):
         l = as0*b0*L
@@ -55,10 +61,12 @@ class NLL:
 
     def R_LL(self,v):
         L = m.log(1./v)
+        L = self.fuzzymin(L,.5/(self.as0*self.b0))
         return 2.*CF*L*(self.r1(self.as0,self.b0,self.a,self.b,L))
 
     def R_LLp(self,v):
         L = m.log(1./v)
+        L = self.fuzzymin(L,.5/(self.as0*self.b0))
         return 2.*CF*self.lr1p(self.as0,self.b0,self.a,self.b,L)
 
     def r2(self,as0,b0,b1,K,a,b,L):
@@ -79,12 +87,14 @@ class NLL:
 
     def R_NLL(self,v):
         L = m.log(1./v)
+        L = self.fuzzymin(L,.5/(self.as0*self.b0))
         return 2.*CF*\
             (self.r2(self.as0,self.b0,self.b1,self.K,self.a,self.b,L)+\
              self.Bl*self.T(self.as0,self.b0,L/(self.a+self.b)))
 
     def R_NLLp(self,v):
         L = m.log(1./v)
+        L = self.fuzzymin(L,.5/(self.as0*self.b0))
         return 2.*CF*\
             (self.r2p(self.as0,self.b0,self.b1,self.K,self.a,self.b,L)+
              self.Bl*self.Tp(self.as0,self.b0,L/(self.a+self.b))/(self.a+self.b))

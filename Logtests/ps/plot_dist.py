@@ -208,7 +208,6 @@ tau_values = np.logspace(mylog10(min_tau), -0.001, 10000)  # Upper limit set to 
 # Calculate theoretical probability densities
 pLL_values = wLL(tau_values)
 pNLL_values = wNLL(tau_values)
-print("pLL_values=", pLL_values)
 
 # Export theoretical distributions to CSV
 export_theoretical_data(tau_values, pLL_values, pNLL_values, 'theoretical_distribution.csv')
