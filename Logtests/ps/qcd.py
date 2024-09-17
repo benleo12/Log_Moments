@@ -47,7 +47,7 @@ class AlphaS:
         w = 1+b0*asref*mylog(t/tref)
         return asref/w*(1-b1/b0*asref*mylog(w)/w)
 
-    def __call__(self,t,nf=-1):
+    def __call__(self,t,nf=5):
         if self.order == -1: return self.asmz
         if self.order == 0: return self.as0(t,nf)
         return self.as1(t,nf)
