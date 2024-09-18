@@ -16,11 +16,15 @@ parser.add_argument('--nuisance_mu1', type=float, default=0, help='Mean of the f
 parser.add_argument('--nuisance_sigma1', type=float, default=1, help='Standard deviation of the first nuisance parameter')
 parser.add_argument('--nuisance_mu2', type=float, default=0, help='Mean of the second nuisance parameter')
 parser.add_argument('--nuisance_sigma2', type=float, default=1, help='Standard deviation of the second nuisance parameter')
+parser.add_argument('-K', type=float, default=1)
+parser.add_argument('-B', type=float, default=1)
 # Debugging: Verify this line is executed
 print("Debug: Adding arguments complete")
 import sys
 print(sys.argv)
 
+import config
+config.use_torch = 1
 # Parse arguments
 args = parser.parse_args()
 n_samp = args.e
@@ -28,15 +32,21 @@ n_step = args.n_step
 step_frac = args.step_frac
 samp_fac = args.samp_fac
 asif = args.asif
+config.Kfac = args.K
+config.Blfac = args.B
 
 # Define a function to save parameters to a file
-def save_params(lambda_1, lambda_2, npm1, npm2, asif):
+def save_params(lambda_1, lambda_2, npm1, npm2, nps1, nps2, npn1, npn2, asif):
     filename = f"params_{args.piece}_{n_samp}.txt"
     with open(filename, 'w') as f:
         f.write(f"lambda_1: {lambda_1}\n")
         f.write(f"lambda_2: {lambda_2}\n")
         f.write(f"npm1: {npm1}\n")
         f.write(f"npm2: {npm2}\n")
+        f.write(f"nps1: {nps1}\n")
+        f.write(f"nps2: {nps2}\n")
+        f.write(f"npn1: {npn1}\n")
+        f.write(f"npn2: {npn2}\n")
         f.write(f"asif: {asif}\n")
 
 print("Script started")
@@ -88,15 +98,15 @@ def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=1000000):
 def run_pypy_script(pypy_script_path, asif, n_samp, piece):
     """Runs the PyPy script with specified flags that generates the CSV file."""
     # Define the additional flags as a list
-    flags = ['-e', str(n_samp), '-A', str(asif), '-b', '1', '-C', '1', '-x', str(piece)]
+    flags = ['-e', str(n_samp), '-A', str(asif), '-b', '1', '-C', '0.1','-x',str(piece),'-K',str(args.K),'-B',str(args.B)]
 
     # Create the filename based on flags and ensure it includes "LL"
     filename = f"thrust_e{n_samp}_A{asif}_{args.piece}.csv"
     
     # Check if the file already exists
-    if os.path.exists(filename):
-        print(f"File {filename} already exists. Not overwriting.")
-        return filename
+     # Create the filename based on flags and ensure it includes "LL"
+    filename = [ f"thrust_e{n_samp}_A{asif}_{args.piece}_K{args.K}_B{args.B}.csv",
+                 f"weight_e{n_samp}_A{asif}_{args.piece}_K{args.K}_B{args.B}.csv" ]
 
     try:
         # Include the additional flags in the subprocess call
@@ -104,7 +114,8 @@ def run_pypy_script(pypy_script_path, asif, n_samp, piece):
         
         # Check if the expected output file exists and rename it
         if os.path.exists("thrust_values.csv"):
-            os.rename("thrust_values.csv", filename)
+            os.rename("thrust_values.csv", filename[0])
+            os.rename("weight_values.csv", filename[1])
         else:
             print("Expected output file 'thrust_values.csv' not found.")
             return None
@@ -115,13 +126,15 @@ def run_pypy_script(pypy_script_path, asif, n_samp, piece):
     
     return filename
 
-def read_csv_to_torch(csv_file_path):
+def read_csv_to_torch(csv_file_paths):
     """Reads the CSV file and converts it to a PyTorch tensor."""
-    with open(csv_file_path, 'r') as csvfile:
+    with open(csv_file_paths[0], 'r') as csvfile:
         csv_reader = csv.reader(csvfile)
         tau_values = [float(row[0]) for row in csv_reader]
-    return torch.tensor(tau_values)
-
+    with open(csv_file_paths[1], 'r') as csvfile:
+        csv_reader = csv.reader(csvfile)
+        wgt_values = [float(row[0]) for row in csv_reader]
+    return torch.stack([torch.tensor(tau_values), torch.tensor(wgt_values)], dim=1)
 # Define the range
 
 # Manual integration function using Riemann sum
@@ -130,20 +143,24 @@ def mc_integration(integrand, tau_values, n_samp):
     return integral
 
 # Define the integral equations using the dataset directly
-def prep_integral_equation_2_direct(lambda_0, lambda_1, lambda_2, tau_i, n_samp, printit=False):
+def prep_integral_equation_2_direct(lambda_0,lambda_1, lambda_2, tau_i, n_samp,printit=False):
     n_bins = args.nbins
-    n_samp = int(list(tau_i.size())[0] / n_bins) * n_bins
-    tau_i, indices = torch.sort(tau_i[:n_samp])
-    bins = tau_i.reshape(n_bins, int(n_samp / n_bins))
+    n_samp = int(list(tau_i.size())[0]/n_bins)*n_bins
+    tau_i = tau_i[:n_samp]
+    tau_i = tau_i[tau_i[:,0].sort()[1]]
+    bins = tau_i[:,0].reshape(n_bins,int(n_samp/n_bins))
+    wgts = tau_i[:,1].reshape(n_bins,int(n_samp/n_bins))
     if printit:
-        print('NBins', n_bins, tau_i.size())
-    maxs, ids = torch.max(bins, 1)
-    mins, ids = torch.min(bins, 1)
-    return [bins, mins, maxs, n_samp]
+        print('NBins',n_bins,tau_i.size())
+    maxs, ids = torch.max(bins,1)
+    mins, ids = torch.min(bins,1)
+#    if printit:
+#        print('Params',mins)
+#        print('Params',maxs)
+#        print('Params',cens)
+    return [bins,wgts,mins,maxs,n_samp]
 
-def gaussian_prior(param):
-    # Gaussian prior with mean at the parameter itself and variance of 1
-    return 0.5 * (param ** 2)
+
 
 def integral_equation_2_direct( lambda_0, lambda_1, lambda_2, bins, npm1, nps1, npn1, npm2, nps2, npn2, printit=False):
     # Compute the main components
@@ -154,23 +171,26 @@ def integral_equation_2_direct( lambda_0, lambda_1, lambda_2, bins, npm1, nps1, 
     partn = (CLL * RLLp + CNLL * RNLLp) 
     partd = ((CLL - lambda_1) * RLLp + (CNLL - lambda_2) * RNLLp)
     expon = torch.exp(-lambda_1 * analytics.R_LL(bins[0]) - lambda_2 * analytics.R_NLL(bins[0]))
-    
+    expon_th = torch.exp(- analytics.R_LL(bins[0]) - analytics.R_NLL(bins[0]))
     # Incorporate the nuisance parameters into the exponential
-    gaussian_term1 = torch.exp(-0.5* asif * (bins[0]-npm1) ** 2 /nps1**2)*npn1 
-    gaussian_term2 = torch.exp(-0.5* asif * (bins[0]-npm2) ** 2 /nps2**2)*npn2
+    gaussian_term1 = torch.exp(-0.5* asif * (torch.log(bins[0])-torch.log(npm1)) ** 2 /nps1**2)*npn1 * bins[0]
+    gaussian_term2 = torch.exp(-0.5* asif * (torch.log(bins[0])-torch.log(npm2)) ** 2 /nps2**2)*npn2 * bins[0]
 
+    gaussians = gaussian_term1 - gaussian_term2
+    gaussians_norm = gaussians/expon_th
     # Derivative of gaussian_term1 with respect to bins[0]
-    gaussian_term1_derivative = gaussian_term1 * (-asif * (bins[0] - npm1) / nps1**2)
-    gaussian_term2_derivative = gaussian_term2 * (-asif * (bins[0] - npm2) / nps2**2)
+    #gaussian_term1_derivative = gaussian_term1 * (-asif * (bins[0] - npm1) / nps1**2)
+    #gaussian_term2_derivative = gaussian_term2 * (-asif * (bins[0] - npm2) / nps2**2)
     
-    new_part = (partn + gaussian_term1_derivative - gaussian_term2_derivative) / (partd + gaussian_term1 - gaussian_term2)
+    new_part = 1/ (partd)
     # Combine all terms together
-    vals = torch.sum(new_part*(expon + gaussian_term1 - gaussian_term2), 1) / bins[3]
+    weight = bins[1]
+    vals = torch.sum(weight*new_part*expon*(partn+ gaussians_norm), 1) / bins[4]
 
     
     # Analytical comparison
-    anas = torch.exp(-analytics.R_LL(bins[2]) - analytics.R_NLL(bins[2]))
-    anas -= torch.exp(-analytics.R_LL(bins[1]) - analytics.R_NLL(bins[1]))
+    anas = torch.exp(-analytics.R_LL(bins[3]) - analytics.R_NLL(bins[3]))
+    anas -= torch.exp(-analytics.R_LL(bins[2]) - analytics.R_NLL(bins[2]))
     
     # Calculate the loss as the squared difference, including the nuisance parameters
     integral = torch.sum((vals - anas) ** 2)
@@ -186,18 +206,43 @@ def integral_equation_2_direct( lambda_0, lambda_1, lambda_2, bins, npm1, nps1, 
     
     return loss
 
+
+# Generate data once
+pypy_script_path = os.path.expanduser('dire.py')
+# Run the PyPy script and get the output filename
+output_filename = run_pypy_script(pypy_script_path, asif, n_samp, args.piece)
+
+if output_filename:
+    if os.path.exists(output_filename[0]):
+        tau_i = read_csv_to_torch(output_filename)
+    else:
+        print(f"CSV file not found: {output_filename}")
+        raise RuntimeError("Data generation failed. Exiting.")
+else:
+    print("PyPy script execution failed.")
+    raise RuntimeError("Data generation failed. Exiting.")
+
+filtered_tau_0 = tau_i
+print("Nonzero tau values: ", len(filtered_tau_0))
+
+# Now you can use min_tau and peak_tau in your further calculations
+min_tau = tau_i.min(dim=0).values[0]
+max_tau = tau_i.max(dim=0).values[0]
+
+print("Tau min/max: ", min_tau.item(), max_tau.item())
+
 # Initialize the Lagrange multipliers
 lambda_0 = torch.tensor([0.0], requires_grad=True)
 lambda_1 = torch.tensor([args.lam1], requires_grad=True)
 lambda_2 = torch.tensor([args.lam2], requires_grad=True)
 
 # Initialize the nuisance parameters
-npm1 = torch.tensor([0.1], requires_grad=True)
-npm2 = torch.tensor([0.1], requires_grad=True)
+npm1 = torch.tensor([0.8*max_tau], requires_grad=True)
+npm2 = torch.tensor([max_tau], requires_grad=True)
 torch.clamp(npm1, min=0.0, max=1.0)
 torch.clamp(npm2, min=0.0, max=1.0)
 nps1 = torch.tensor([0.1], requires_grad=True)
-nps2 = torch.tensor([0.1], requires_grad=True)
+nps2 = torch.tensor([0.2], requires_grad=True)
 npn1 = torch.tensor([0.1], requires_grad=True)
 npn2 = torch.tensor([0.1], requires_grad=True)
 
@@ -208,31 +253,7 @@ lambda_2_values = []
 loss_values = []
 n_samp_values = []
 
-# Generate data once
-pypy_script_path = os.path.expanduser('dire.py')
-# Run the PyPy script and get the output filename
-output_filename = run_pypy_script(pypy_script_path, asif, n_samp, args.piece)
-
-if output_filename:
-    if os.path.exists(output_filename):
-        tau_i = read_csv_to_torch(output_filename)
-    else:
-        print(f"CSV file not found: {output_filename}")
-        raise RuntimeError("Data generation failed. Exiting.")
-else:
-    print("PyPy script execution failed.")
-    raise RuntimeError("Data generation failed. Exiting.")
-
-filtered_tau_0 = tau_i[(tau_i != 0.0)]
-print("Nonzero tau values: ", len(filtered_tau_0))
-
-# Now you can use min_tau and peak_tau in your further calculations
-min_tau = torch.min(filtered_tau_0)
-max_tau = torch.max(filtered_tau_0)
-
-print("Tau min/max: ", min_tau.item(), max_tau.item())
-
-filtered_tau_i = tau_i[(tau_i >= min_tau) & (tau_i <= max_tau)]
+filtered_tau_i = tau_i
 
 CN = torch_quad(wLL, min_tau, max_tau)
 CLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_LL)
@@ -243,10 +264,10 @@ print("CLL  =", CLL)
 print("CNLL =", CNLL)
 
 # Define the optimizer, including nuisance parameters
-defrate = 0.01
+defrate = 0.001
 if args.piece == 'll':
     optimizer = optim.Adam([
-        {'params': lambda_1, 'lr': defrate},
+        #{'params': lambda_1, 'lr': defrate},
         {'params': npm1, 'lr': defrate},
         {'params': npm2, 'lr': defrate},
         {'params': nps1, 'lr': defrate},
@@ -256,8 +277,8 @@ if args.piece == 'll':
     ])
 if args.piece == 'nllc' or args.piece == 'nll1':
     optimizer = optim.Adam([
-        {'params': lambda_1, 'lr': defrate},
-        {'params': lambda_2, 'lr': defrate},
+        #{'params': lambda_1, 'lr': defrate},
+       # {'params': lambda_2, 'lr': defrate},
         {'params': npm1, 'lr': defrate},
         {'params': npm2, 'lr': defrate},
         {'params': nps1, 'lr': defrate},
@@ -298,7 +319,7 @@ for step in range(1000000):
 
     # Save parameters if loss doesn't change
     if step > 0 and abs(loss.item() - loss_values[step - 1]) < 1e-10:
-        save_params(lambda_1.item(), lambda_2.item(), npm1.item(), nps1.item() , npm2.item(), nps2.item(), asif)
+        save_params(lambda_1.item(), lambda_2.item(), npm1.item(), nps1.item(), npn1.item() , npm2.item(), nps2.item(), npn2.item(), asif)
         break
 
 print("")

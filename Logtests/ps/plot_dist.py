@@ -109,6 +109,9 @@ from scipy.integrate import quad
 min_tau = min([ i if i>0. else 1. for i in thrust_values ])
 max_tau = 0.999
 
+#min_tau = thrust_values.min(dim=0).values[0]
+max_tau = 0.5
+
 analytics = nll.NLL(alphas,a=1,b=1,t=ecms**2,piece=opts.piece)
 
 # Define wLL and wNLL functions
@@ -144,22 +147,43 @@ def wNLL(tau_values):
     return np.array(results)
 
 # Numerical integration
-CNLL0, _ = quad(lambda t: wNLL(t), min_tau, max_tau)
-CNLL1, _ = quad(lambda t: wNLL(t) * ((analytics.R_NLL(t)-analytics.logF(t))), min_tau, max_tau)
-CNLL2, _ = quad(lambda t: wNLL(t) * (analytics.R_LL(t)), min_tau, max_tau)
+CLL0, _ = quad(lambda t: wNLL(t), min_tau, max_tau)
+CNLL, _ = quad(lambda t: wNLL(t) * ((analytics.R_NLL(t)-analytics.logF(t))), min_tau, max_tau)
+CLL, _ = quad(lambda t: wNLL(t) * (analytics.R_LL(t)), min_tau, max_tau)
 
 lambda_0 = 0.0
 lambda_2 = 0.0
 lambda_1 = 0.0
+npm1 = 0.008
+npm2 = 0.0007
+nps1 = 0.171
+nps2 = 0.1227
+npn1 = 2.588
+npn2 = -2.785
 
-def weight(tau_i):
-    if tau_i<min_tau:
-       return 0
-    Rpt = analytics.R_LLp(tau_i)
-    RNLLpt = analytics.R_NLLp(tau_i)
-    part = (CNLL2*Rpt + CNLL1*(RNLLpt))/((CNLL2-lambda_2)*Rpt+(CNLL1-lambda_1)*(RNLLpt))
+
+
+def weight(tau_i,w_i):
+    #print("tau_i",tau_i)
+    RLLp = analytics.R_LLp(tau_i)
+    RNLLp = analytics.R_NLLp(tau_i)
+    partn = (CLL * RLLp + CNLL * RNLLp) 
+    partd = ((CLL - lambda_1) * RLLp + (CNLL - lambda_2) * RNLLp)
     expon = np.exp( - lambda_1*(analytics.R_NLL(tau_i)) -  lambda_2*analytics.R_LL(tau_i))
-    return expon*part
+    expon_th = np.exp( -(analytics.R_NLL(tau_i)) -  analytics.R_LL(tau_i))
+    #incorporate the nuisance parameters into the exponential
+    gaussian_term1 = np.exp(-0.5* float(opts.alphas) * (m.log(tau_i)-m.log(npm1)) ** 2 /nps1**2)*npn1*tau_i 
+    gaussian_term2 = np.exp(-0.5* float(opts.alphas) * (m.log(tau_i)-m.log(npm2)) ** 2 /nps2**2)*npn2*tau_i
+
+    gaussians =  gaussian_term1 - gaussian_term2
+    gaussians_norm = gaussians/expon_th
+    # Derivative of gaussian_term1 with respect to bins[0]
+    #gaussian_term1_derivative = gaussian_term1 * (-float(opts.alphas) * (tau_i - npm1) / nps1**2)
+    #gaussian_term2_derivative = gaussian_term2 * (-float(opts.alphas) * (tau_i - npm2) / nps2**2)
+    new_part = 1 / partd 
+    #print("new_part",new_part)
+    #print("new_part*(expon + gaussian_term1 - gaussian_term2)",new_part*(expon + gaussian_term1 - gaussian_term2))
+    return w_i*(new_part*expon*(partn + gaussians_norm))
 
 import pandas as pd
 import numpy as np
@@ -213,7 +237,7 @@ pNLL_values = wNLL(tau_values)
 export_theoretical_data(tau_values, pLL_values, pNLL_values, 'theoretical_distribution.csv')
 
 # Calculating weights for each thrust value
-weights = weight_values
+weights = [weight(thrust,weigh) for thrust, weigh in zip(thrust_values,weight_values)]
 
 # After calculating thrust data
 # Export thrust data to CSV

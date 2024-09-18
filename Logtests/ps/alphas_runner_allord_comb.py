@@ -5,17 +5,22 @@ import numpy as np
 
 # Define the values of asif and evs to iterate over
 asif_values = [0.118]#[0.01, 0.0075, 0.005, 0.0025]
-evs = 1000000
+evs = 100000
 
 # Define a function to run the LL script with specific asif values
 def run_ll_script(asif):
     command = [
         'python3', 'shower_chi2_run_thrust_nuiss.py',
-        #'--asif', str(asif),
+        '--asif', str(asif),
         '--e', str(evs),
         '--piece', 'll',
-        '--nbins', '32'
+        '--nbins', '128',
+        '-K', '0.0',
+        '-B', '0.0',
+        '-C', '0.01'
     ]
+
+    
     try:
         subprocess.check_call(command)
     except subprocess.CalledProcessError as e:
@@ -28,7 +33,9 @@ def run_nllc_script(asif, lambda_1):
         #'--asif', str(asif),
         '--e', str(evs),
         '--piece', 'nllc',
-        '--nbins', '32'
+        '--nbins', '128',
+        '-K', '1',
+        '-B', '0.0'
     ]
     try:
         subprocess.check_call(command)
