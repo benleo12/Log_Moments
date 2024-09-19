@@ -147,7 +147,7 @@ CNLL, _ = quad(lambda t: wNLL(t) * ((analytics.R_NLL(t)-analytics.logF(t))), min
 CLL, _ = quad(lambda t: wNLL(t) * (analytics.R_LL(t)), min_tau, max_tau)
 
 lambda_0 = 0.0
-lambda_1, lambda_2, npm1, npm2, nps1, nps2, npn1, npn2 = 2.5798105897709292e-05, 0.015218361877263104, 0.02000703086221015, 0.28558223308996133, 0.28401968983604975, 0.07885502519083532, 0.25987742508032147, 0.07823328566301403
+lambda_1, lambda_2, npm1, npm2, nps1, nps2, npn1, npn2 = 0.008303365196098627, 0.028592561718013335, 0.30143915006392746, 0.300065001025007, 0.07008604234713191, 0.23260547429703668, 0.07165096510758996, 0.13307553088856458
 
 def weight(tau_i,w_i):
     RLLp = analytics.R_LLp(tau_i)

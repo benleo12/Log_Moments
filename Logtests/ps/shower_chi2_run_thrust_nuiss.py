@@ -1,6 +1,4 @@
 import argparse
-print("Script started")
-# other imports and code follow
 
 parser = argparse.ArgumentParser(description='Process events and analyze thrust.')
 parser.add_argument('--e', type=int, default=20000, help='Number of samples to process')
@@ -20,10 +18,7 @@ parser.add_argument('--nuisance_mu2', type=float, default=0, help='Mean of the s
 parser.add_argument('--nuisance_sigma2', type=float, default=1, help='Standard deviation of the second nuisance parameter')
 parser.add_argument('-K', type=float, default=1)
 parser.add_argument('-B', type=float, default=1)
-# Debugging: Verify this line is executed
-print("Debug: Adding arguments complete")
 import sys
-print(sys.argv)
 
 import config
 config.use_torch = 1
@@ -50,8 +45,6 @@ def save_params(lambda_1, lambda_2, npm1, npm2, nps1, nps2, npn1, npn2, asif):
         f.write(f"npn1: {npn1}\n")
         f.write(f"npn2: {npn2}\n")
         f.write(f"asif: {asif}\n")
-
-print("Script started")
 
 import torch
 import torch.optim as optim
@@ -164,9 +157,6 @@ pypy_script_path = os.path.expanduser('dire.py')
 # Run the PyPy script and get the output filename
 tau_i = run_pypy_script(pypy_script_path, asif, n_samp, args.piece)
 
-filtered_tau_0 = tau_i
-print("Nonzero tau values: ", len(filtered_tau_0))
-
 # Now you can use min_tau and peak_tau in your further calculations
 min_tau = tau_i.min(dim=0).values[0]
 max_tau = tau_i.max(dim=0).values[0]
@@ -177,7 +167,7 @@ max_tau = torch.tensor(min(args.max,max_tau.item()))
 tau_i = tau_i[ tau_i[:,0] > min_tau ]
 tau_i = tau_i[ tau_i[:,0] < max_tau ]
 
-print("Tau min/max: ", min_tau.item(), max_tau.item())
+print("Tau min/max:", min_tau.item(), max_tau.item())
 
 # Initialize the Lagrange multipliers
 lambda_0 = torch.tensor([0.0], requires_grad=True)
@@ -198,8 +188,6 @@ lambda_1_values = []
 lambda_2_values = []
 loss_values = []
 n_samp_values = []
-
-filtered_tau_i = tau_i
 
 CN = torch_quad(wLL, min_tau, max_tau)
 CLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_LL)
@@ -226,7 +214,7 @@ if args.piece == 'nllc' or args.piece == 'nll1':
     if args.lam2<0.0: parms.append({'params': lambda_2, 'lr': defrate})
 optimizer = optim.Adam(parms)
 
-bins = prep_integral_equation_2_direct(lambda_0, lambda_1, lambda_2, filtered_tau_i, n_samp, True)
+bins = prep_integral_equation_2_direct(lambda_0, lambda_1, lambda_2, tau_i, n_samp, True)
 
 integral_equation_2_direct(lambda_0, lambda_1, lambda_2, bins, npm1, nps1, npn1, npm2, nps2, npn2, True)
 
