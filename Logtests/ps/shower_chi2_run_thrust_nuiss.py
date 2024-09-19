@@ -9,6 +9,8 @@ parser.add_argument('--step_frac', type=float, default=1, help='Fractional step 
 parser.add_argument('--samp_fac', type=float, default=1, help='Sample factor for scaling')
 parser.add_argument('--asif', type=float, default=0.02, help='alphas limit')
 parser.add_argument('--piece', default='ll', help='piece to fit')
+parser.add_argument('--min', type=float, default='0')
+parser.add_argument('--max', type=float, default='1')
 parser.add_argument('--lam1', type=float, default='-1')
 parser.add_argument('--lam2', type=float, default='-1')
 parser.add_argument('--nbins', type=int, default='16')
@@ -83,7 +85,6 @@ def wLL(tau):
 
 def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=1000000):
     x = torch.logspace(torch.log10(a), torch.log10(b), steps=num_steps, dtype=torch.float64)
-    print("x", x)
     dx = (x[1:] - x[:-1])
     y = (func(x[1:]) + func(x[:-1])) / 2.
     if func_mul is not None:
@@ -91,7 +92,6 @@ def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=1000000):
     if func_mul2 is not None:
         y *= (func_mul2(x[1:]) + func_mul2(x[:-1])) / 2.
     y_dx = y * dx
-    print("y_dx", y_dx)
     integral = torch.sum(y_dx)
     return integral
 
@@ -144,35 +144,19 @@ def prep_integral_equation_2_direct(lambda_0,lambda_1, lambda_2, tau_i, n_samp,p
 
 
 def integral_equation_2_direct( lambda_0, lambda_1, lambda_2, bins, npm1, nps1, npn1, npm2, nps2, npn2, printit=False):
-    # Compute the main components
     RLLp = analytics.R_LLp(bins[0])
     RNLLp = analytics.R_NLLp(bins[0])
-    
-    # Part contribution based on parameters
     partn = (CLL * RLLp + CNLL * RNLLp) 
     partd = ((CLL - lambda_1) * RLLp + (CNLL - lambda_2) * RNLLp)
     expon = torch.exp(-lambda_1 * analytics.R_LL(bins[0]) - lambda_2 * analytics.R_NLL(bins[0]))
     sudth = torch.exp(- analytics.R_LL(bins[0]) - analytics.R_NLL(bins[0]))
-    # Incorporate the nuisance parameters into the exponential
     gauss1 = torch.exp(-0.5*(torch.log(bins[0])-torch.log(npm1)) ** 2 /nps1**2)*npn1 * bins[0]
     gauss2 = torch.exp(-0.5*(torch.log(bins[0])-torch.log(npm2)) ** 2 /nps2**2)*npn2 * bins[0]
-    # Combine all terms together
     vals = torch.sum(bins[1]*expon*(partn + (gauss1-gauss2)/sudth)/partd, 1) / bins[4]
-
-    # Analytical comparison
     anas = torch.exp(-analytics.R_LL(bins[3]) - analytics.R_NLL(bins[3]))
     anas -= torch.exp(-analytics.R_LL(bins[2]) - analytics.R_NLL(bins[2]))
-    
-    # Calculate the loss as the squared difference, including the nuisance parameters
     integral = torch.sum((vals - anas) ** 2)
-    
-    # Final loss is the integral + regularization (which includes the influence of nuisance parameters)
-    loss = integral
-
-    if printit:
-        print(f'\\Chi^2 is {loss.item()} at {lambda_1.item()} {lambda_2.item()} with nuisance params: {npm1.item()} {npm2.item()} {nps1.item()} {nps2.item()} {npn1.item()} {npn2.item()}')
-    
-    return loss
+    return integral
 
 
 # Generate data once
@@ -186,6 +170,12 @@ print("Nonzero tau values: ", len(filtered_tau_0))
 # Now you can use min_tau and peak_tau in your further calculations
 min_tau = tau_i.min(dim=0).values[0]
 max_tau = tau_i.max(dim=0).values[0]
+
+min_tau = torch.tensor(max(args.min,min_tau.item()))
+max_tau = torch.tensor(min(args.max,max_tau.item()))
+
+tau_i = tau_i[ tau_i[:,0] > min_tau ]
+tau_i = tau_i[ tau_i[:,0] < max_tau ]
 
 print("Tau min/max: ", min_tau.item(), max_tau.item())
 
