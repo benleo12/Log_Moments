@@ -9,8 +9,8 @@ parser.add_argument('--step_frac', type=float, default=1, help='Fractional step 
 parser.add_argument('--samp_fac', type=float, default=1, help='Sample factor for scaling')
 parser.add_argument('--asif', type=float, default=0.02, help='alphas limit')
 parser.add_argument('--piece', default='ll', help='piece to fit')
-parser.add_argument('--lam1', type=float, default='0')
-parser.add_argument('--lam2', type=float, default='0')
+parser.add_argument('--lam1', type=float, default='-1')
+parser.add_argument('--lam2', type=float, default='-1')
 parser.add_argument('--nbins', type=int, default='16')
 parser.add_argument('--nuisance_mu1', type=float, default=0, help='Mean of the first nuisance parameter')
 parser.add_argument('--nuisance_sigma1', type=float, default=1, help='Standard deviation of the first nuisance parameter')
@@ -95,37 +95,6 @@ def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=1000000):
     integral = torch.sum(y_dx)
     return integral
 
-def run_pypy_script(pypy_script_path, asif, n_samp, piece):
-    """Runs the PyPy script with specified flags that generates the CSV file."""
-    # Define the additional flags as a list
-    flags = ['-e', str(n_samp), '-A', str(asif), '-b', '1', '-C', '0.1','-x',str(piece),'-K',str(args.K),'-B',str(args.B)]
-
-    # Create the filename based on flags and ensure it includes "LL"
-    filename = f"thrust_e{n_samp}_A{asif}_{args.piece}.csv"
-    
-    # Check if the file already exists
-     # Create the filename based on flags and ensure it includes "LL"
-    filename = [ f"thrust_e{n_samp}_A{asif}_{args.piece}_K{args.K}_B{args.B}.csv",
-                 f"weight_e{n_samp}_A{asif}_{args.piece}_K{args.K}_B{args.B}.csv" ]
-
-    try:
-        # Include the additional flags in the subprocess call
-        subprocess.check_call(['pypy', pypy_script_path] + flags)
-        
-        # Check if the expected output file exists and rename it
-        if os.path.exists("thrust_values.csv"):
-            os.rename("thrust_values.csv", filename[0])
-            os.rename("weight_values.csv", filename[1])
-        else:
-            print("Expected output file 'thrust_values.csv' not found.")
-            return None
-        
-    except subprocess.CalledProcessError as e:
-        print("An error occurred while running the PyPy script:", e)
-        return None
-    
-    return filename
-
 def read_csv_to_torch(csv_file_paths):
     """Reads the CSV file and converts it to a PyTorch tensor."""
     with open(csv_file_paths[0], 'r') as csvfile:
@@ -135,7 +104,19 @@ def read_csv_to_torch(csv_file_paths):
         csv_reader = csv.reader(csvfile)
         wgt_values = [float(row[0]) for row in csv_reader]
     return torch.stack([torch.tensor(tau_values), torch.tensor(wgt_values)], dim=1)
-# Define the range
+
+def run_pypy_script(pypy_script_path, asif, n_samp, piece):
+    flags = ['-e', str(n_samp), '-A', str(asif), '-b', '1', '-C', '0.1','-x',str(piece),'-K',str(args.K),'-B',str(args.B)]
+    filename = f"thrust_e{n_samp}_A{asif}_{args.piece}.csv"
+    filename = [ f"thrust_e{n_samp}_A{asif}_{args.piece}_K{args.K}_B{args.B}.csv",
+                 f"weight_e{n_samp}_A{asif}_{args.piece}_K{args.K}_B{args.B}.csv" ]
+    if os.path.exists(filename[0]):
+        return read_csv_to_torch(filename)
+    subprocess.check_call(['pypy', pypy_script_path] + flags)
+    if os.path.exists("thrust_values.csv"):
+        os.rename("thrust_values.csv", filename[0])
+        os.rename("weight_values.csv", filename[1])
+    return read_csv_to_torch(filename)
 
 # Manual integration function using Riemann sum
 def mc_integration(integrand, tau_values, n_samp):
@@ -197,17 +178,7 @@ def integral_equation_2_direct( lambda_0, lambda_1, lambda_2, bins, npm1, nps1, 
 # Generate data once
 pypy_script_path = os.path.expanduser('dire.py')
 # Run the PyPy script and get the output filename
-output_filename = run_pypy_script(pypy_script_path, asif, n_samp, args.piece)
-
-if output_filename:
-    if os.path.exists(output_filename[0]):
-        tau_i = read_csv_to_torch(output_filename)
-    else:
-        print(f"CSV file not found: {output_filename}")
-        raise RuntimeError("Data generation failed. Exiting.")
-else:
-    print("PyPy script execution failed.")
-    raise RuntimeError("Data generation failed. Exiting.")
+tau_i = run_pypy_script(pypy_script_path, asif, n_samp, args.piece)
 
 filtered_tau_0 = tau_i
 print("Nonzero tau values: ", len(filtered_tau_0))
@@ -220,14 +191,12 @@ print("Tau min/max: ", min_tau.item(), max_tau.item())
 
 # Initialize the Lagrange multipliers
 lambda_0 = torch.tensor([0.0], requires_grad=True)
-lambda_1 = torch.tensor([args.lam1], requires_grad=True)
-lambda_2 = torch.tensor([args.lam2], requires_grad=True)
+lambda_1 = torch.tensor([max(args.lam1,0.0)], requires_grad=True)
+lambda_2 = torch.tensor([max(args.lam2,0.0)], requires_grad=True)
 
 # Initialize the nuisance parameters
 npm1 = torch.tensor([0.8*max_tau], requires_grad=True)
 npm2 = torch.tensor([max_tau], requires_grad=True)
-torch.clamp(npm1, min=0.0, max=1.0)
-torch.clamp(npm2, min=0.0, max=1.0)
 nps1 = torch.tensor([0.1], requires_grad=True)
 nps2 = torch.tensor([0.2], requires_grad=True)
 npn1 = torch.tensor([0.1], requires_grad=True)
@@ -252,27 +221,20 @@ print("CNLL =", CNLL)
 
 # Define the optimizer, including nuisance parameters
 defrate = 0.001
+parms= [
+    {'params': npm1, 'lr': defrate},
+    {'params': npm2, 'lr': defrate},
+    {'params': nps1, 'lr': defrate},
+    {'params': nps2, 'lr': defrate},
+    {'params': npn1, 'lr': defrate},
+    {'params': npn2, 'lr': defrate}
+]
 if args.piece == 'll':
-    optimizer = optim.Adam([
-        #{'params': lambda_1, 'lr': defrate},
-        {'params': npm1, 'lr': defrate},
-        {'params': npm2, 'lr': defrate},
-        {'params': nps1, 'lr': defrate},
-        {'params': nps2, 'lr': defrate},
-        {'params': npn1, 'lr': defrate},
-        {'params': npn2, 'lr': defrate}
-    ])
+    if args.lam1<0.0: parms.append({'params': lambda_1, 'lr': defrate})
 if args.piece == 'nllc' or args.piece == 'nll1':
-    optimizer = optim.Adam([
-        #{'params': lambda_1, 'lr': defrate},
-       # {'params': lambda_2, 'lr': defrate},
-        {'params': npm1, 'lr': defrate},
-        {'params': npm2, 'lr': defrate},
-        {'params': nps1, 'lr': defrate},
-        {'params': nps2, 'lr': defrate},
-        {'params': npn1, 'lr': defrate},
-        {'params': npn2, 'lr': defrate}
-    ])
+    if args.lam1<0.0: parms.append({'params': lambda_1, 'lr': defrate})
+    if args.lam2<0.0: parms.append({'params': lambda_2, 'lr': defrate})
+optimizer = optim.Adam(parms)
 
 bins = prep_integral_equation_2_direct(lambda_0, lambda_1, lambda_2, filtered_tau_i, n_samp, True)
 
@@ -294,7 +256,7 @@ for step in range(1000000):
         #npn1.clamp_(0, 5)
         #npn2.clamp_(0, 5)
 
-    print("Step {}: Loss={}; lambda_1, lambda_2, npm1, npm2, nps1, nps2, npn1, npn2 = {}, {}, {}, {}, {}, {}, {}, {}\r".format(
+    print("\rStep {}: Loss={}; lambda_1, lambda_2, npm1, npm2, nps1, nps2, npn1, npn2 = {}, {}, {}, {}, {}, {}, {}, {}".format(
         step, loss.item(), lambda_1.item(), lambda_2.item(), npm1.item(), npm2.item(), nps1.item(), nps2.item(), npn1.item(),npn2.item()), end='', flush=True)
 
     n_samp = int(n_samp * samp_fac)
@@ -310,4 +272,5 @@ for step in range(1000000):
         break
 
 print("")
-print(f"Final Lambda 0: {lambda_0.item()}, Final Lambda 1: {lambda_1.item()}, Final Lambda 2: {lambda_2.item()}, Nuisance m1: {npm1.item()}, Nuisance m2: {npm2.item()}, Nuisance s1: {nps1.item()}, Nuisance s2: {nps2.item()}, Nuisance n1: {npn1.item()}, Nuisance n2: {npn2.item()}")
+print("Final: Loss={}; lambda_1, lambda_2, npm1, npm2, nps1, nps2, npn1, npn2 = {}, {}, {}, {}, {}, {}, {}, {}\n".format(
+        step, loss.item(), lambda_1.item(), lambda_2.item(), npm1.item(), npm2.item(), nps1.item(), nps2.item(), npn1.item(),npn2.item()), end='', flush=True)
