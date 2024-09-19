@@ -263,4 +263,4 @@ for step in range(1000000):
 
 print("")
 print("Final: Loss={}; lambda_1, lambda_2, npm1, npm2, nps1, nps2, npn1, npn2 = {}, {}, {}, {}, {}, {}, {}, {}\n".format(
-        step, loss.item(), lambda_1.item(), lambda_2.item(), npm1.item(), npm2.item(), nps1.item(), nps2.item(), npn1.item(),npn2.item()), end='', flush=True)
+        loss.item(), lambda_1.item(), lambda_2.item(), npm1.item(), npm2.item(), nps1.item(), nps2.item(), npn1.item(),npn2.item()), end='', flush=True)
