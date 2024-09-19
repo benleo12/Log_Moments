@@ -171,23 +171,13 @@ def integral_equation_2_direct( lambda_0, lambda_1, lambda_2, bins, npm1, nps1, 
     partn = (CLL * RLLp + CNLL * RNLLp) 
     partd = ((CLL - lambda_1) * RLLp + (CNLL - lambda_2) * RNLLp)
     expon = torch.exp(-lambda_1 * analytics.R_LL(bins[0]) - lambda_2 * analytics.R_NLL(bins[0]))
-    expon_th = torch.exp(- analytics.R_LL(bins[0]) - analytics.R_NLL(bins[0]))
+    sudth = torch.exp(- analytics.R_LL(bins[0]) - analytics.R_NLL(bins[0]))
     # Incorporate the nuisance parameters into the exponential
-    gaussian_term1 = torch.exp(-0.5* asif * (torch.log(bins[0])-torch.log(npm1)) ** 2 /nps1**2)*npn1 * bins[0]
-    gaussian_term2 = torch.exp(-0.5* asif * (torch.log(bins[0])-torch.log(npm2)) ** 2 /nps2**2)*npn2 * bins[0]
-
-    gaussians = gaussian_term1 - gaussian_term2
-    gaussians_norm = gaussians/expon_th
-    # Derivative of gaussian_term1 with respect to bins[0]
-    #gaussian_term1_derivative = gaussian_term1 * (-asif * (bins[0] - npm1) / nps1**2)
-    #gaussian_term2_derivative = gaussian_term2 * (-asif * (bins[0] - npm2) / nps2**2)
-    
-    new_part = 1/ (partd)
+    gauss1 = torch.exp(-0.5*(torch.log(bins[0])-torch.log(npm1)) ** 2 /nps1**2)*npn1 * bins[0]
+    gauss2 = torch.exp(-0.5*(torch.log(bins[0])-torch.log(npm2)) ** 2 /nps2**2)*npn2 * bins[0]
     # Combine all terms together
-    weight = bins[1]
-    vals = torch.sum(weight*new_part*expon*(partn+ gaussians_norm), 1) / bins[4]
+    vals = torch.sum(bins[1]*expon*(partn + (gauss1-gauss2)/sudth)/partd, 1) / bins[4]
 
-    
     # Analytical comparison
     anas = torch.exp(-analytics.R_LL(bins[3]) - analytics.R_NLL(bins[3]))
     anas -= torch.exp(-analytics.R_LL(bins[2]) - analytics.R_NLL(bins[2]))
@@ -195,12 +185,9 @@ def integral_equation_2_direct( lambda_0, lambda_1, lambda_2, bins, npm1, nps1, 
     # Calculate the loss as the squared difference, including the nuisance parameters
     integral = torch.sum((vals - anas) ** 2)
     
-    # Add a regularization term based on nuisance parameters (optional)
-    #regularization = 0.01 * (torch.sum(npm1 ** 2) + torch.sum(npm2 ** 2))
-    
     # Final loss is the integral + regularization (which includes the influence of nuisance parameters)
-    loss = integral #+ regularization
-    
+    loss = integral
+
     if printit:
         print(f'\\Chi^2 is {loss.item()} at {lambda_1.item()} {lambda_2.item()} with nuisance params: {npm1.item()} {npm2.item()} {nps1.item()} {nps2.item()} {npn1.item()} {npn2.item()}')
     
@@ -307,8 +294,8 @@ for step in range(1000000):
         #npn1.clamp_(0, 5)
         #npn2.clamp_(0, 5)
 
-    print("Step {}, Loss: {}, Lambda 0: {}, Lambda 1: {}, Lambda 2: {}, Nuisance m1: {}, Nuisance m2: {}, Nuisance s1: {}, Nuisance s2: {}, Nuisance n1: {}, Nuisance n2: {}\r".format(
-        step, loss.item(), lambda_0.item(), lambda_1.item(), lambda_2.item(), npm1.item(), npm2.item(), nps1.item(), nps2.item(), npn1.item(),npn2.item()), end='', flush=True)
+    print("Step {}: Loss={}; lambda_1, lambda_2, npm1, npm2, nps1, nps2, npn1, npn2 = {}, {}, {}, {}, {}, {}, {}, {}\r".format(
+        step, loss.item(), lambda_1.item(), lambda_2.item(), npm1.item(), npm2.item(), nps1.item(), nps2.item(), npn1.item(),npn2.item()), end='', flush=True)
 
     n_samp = int(n_samp * samp_fac)
     n_step = int(n_step / step_frac)

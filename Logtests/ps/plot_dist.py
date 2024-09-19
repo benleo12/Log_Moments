@@ -48,6 +48,7 @@ from vector import Vec4, Rotation, LT
 from particle import Particle, CheckEvent
 from qcd import AlphaS, NC, TR, CA, CF
 from analysis import SimplifiedAnalysis
+import os, subprocess, csv
 
 import dire
 import alaric
@@ -71,46 +72,40 @@ elif opts.piece == 'nll1':
 
 alphas = [ AlphaS(ecms,mn(opts.alphas),int(opts.order)),
            AlphaS(ecms,mn(opts.alphas),0) ]
-print("t_0 = {0}, log(Q^2/t_0) = {1}, \\alpha_s(t_0) = {2} / {3}". \
-          format(t0,mylog(ecms**2/t0),alphas[1](t0),alphas[0](t0)))
-if opts.shower == 'A':
-    shower = alaric.Shower(alphas,t0,int(opts.coll),mn(opts.beta),
-                           mn(opts.rcut),int(opts.nmax),opts.lc)
-else:
-    shower = dire.Shower(alphas,t0,int(opts.coll),mn(opts.beta),
-                         mn(opts.rcut),int(opts.nmax),opts.lc)
-jetrat = SimplifiedAnalysis(-0.0033)
 
-rng.seed(int(opts.seed))
-nevt, nout = int(float(opts.events)), 1
-for i in range(1,nevt+1):
-    event, weight = ( [
-            Particle(-11,-Vec4(ecms/mn(2),mn(0),mn(0),ecms/mn(2)),[0,0],0),
-            Particle(11,-Vec4(ecms/mn(2),mn(0),mn(0),-ecms/mn(2)),[0,0],1),
-            Particle(1,Vec4(ecms/mn(2),mn(0),mn(0),ecms/mn(2)),[1,0],2,[3,0]),
-            Particle(-1,Vec4(ecms/mn(2),mn(0),mn(0),-ecms/mn(2)),[0,1],3,[0,2])
-        ], 1 )
-    shower.Run(event,int(opts.nem))
-    check = CheckEvent(event)
-    if len(check): print('Error:',check[0],check[1])
-    if i % nout == 0:
-        if opts.logfile != "":
-            print('Event {n}\n'.format(n=i))
-        else:
-            sys.stdout.write('Event {n}\r'.format(n=i))
-        sys.stdout.flush()
-        if i/nout == 10: nout *= 10
-    jetrat.Analyze(event,weight*shower.w)
-thrust_values, weight_values = jetrat.Finalize()
+def run_pypy_script(pypy_script_path, asif, n_samp, piece, kfac, blfac):
+    flags = ['-e', str(n_samp), '-A', str(asif), '-b', '1', '-C', '0.1','-x',str(piece),'-K',str(kfac),'-B',str(blfac)]
+    filename = [ f"thrust_e{n_samp}_A{asif}_{opts.piece}_K{kfac}_B{blfac}.csv",
+                 f"weight_e{n_samp}_A{asif}_{opts.piece}_K{kfac}_B{blfac}.csv" ]
+    print('Input files:',filename)
+    if os.path.exists(filename[0]):
+        with open(filename[0], 'r') as csvfile:
+            csv_reader = csv.reader(csvfile)
+            tau_values = [float(row[0]) for row in csv_reader]
+        with open(filename[1], 'r') as csvfile:
+            csv_reader = csv.reader(csvfile)
+            wgt_values = [float(row[0]) for row in csv_reader]
+        return tau_values, wgt_values
+    subprocess.check_call(['pypy', pypy_script_path] + flags)
+    os.rename("thrust_values.csv", filename[0])
+    os.rename("weight_values.csv", filename[1])
+    with open(filename[0], 'r') as csvfile:
+        csv_reader = csv.reader(csvfile)
+        tau_values = [float(row[0]) for row in csv_reader]
+    with open(filename[1], 'r') as csvfile:
+        csv_reader = csv.reader(csvfile)
+        wgt_values = [float(row[0]) for row in csv_reader]
+    return tau_values, wgt_values
+
+pypy_script_path = os.path.expanduser('dire.py')
+thrust_values, weight_values = run_pypy_script(pypy_script_path,
+    opts.alphas, opts.events, opts.piece, opts.Kfac, opts.Blfac)
 
 import matplotlib.pyplot as plt
 from scipy.integrate import quad
 # Integration range
 min_tau = min([ i if i>0. else 1. for i in thrust_values ])
 max_tau = 0.999
-
-#min_tau = thrust_values.min(dim=0).values[0]
-max_tau = 0.5
 
 analytics = nll.NLL(alphas,a=1,b=1,t=ecms**2,piece=opts.piece)
 
@@ -152,38 +147,18 @@ CNLL, _ = quad(lambda t: wNLL(t) * ((analytics.R_NLL(t)-analytics.logF(t))), min
 CLL, _ = quad(lambda t: wNLL(t) * (analytics.R_LL(t)), min_tau, max_tau)
 
 lambda_0 = 0.0
-lambda_2 = 0.0
-lambda_1 = 0.0
-npm1 = 0.008
-npm2 = 0.0007
-nps1 = 0.171
-nps2 = 0.1227
-npn1 = 2.588
-npn2 = -2.785
-
-
+lambda_1, lambda_2, npm1, npm2, nps1, nps2, npn1, npn2 = 0.0, 0.0, 0.2733296215475091, 0.0213095733891692, 0.07172022756978434, 1.4146983816472005, 0.11638800131526852, 0.22968614666581727
 
 def weight(tau_i,w_i):
-    #print("tau_i",tau_i)
     RLLp = analytics.R_LLp(tau_i)
     RNLLp = analytics.R_NLLp(tau_i)
     partn = (CLL * RLLp + CNLL * RNLLp) 
     partd = ((CLL - lambda_1) * RLLp + (CNLL - lambda_2) * RNLLp)
     expon = np.exp( - lambda_1*(analytics.R_NLL(tau_i)) -  lambda_2*analytics.R_LL(tau_i))
-    expon_th = np.exp( -(analytics.R_NLL(tau_i)) -  analytics.R_LL(tau_i))
-    #incorporate the nuisance parameters into the exponential
-    gaussian_term1 = np.exp(-0.5* float(opts.alphas) * (m.log(tau_i)-m.log(npm1)) ** 2 /nps1**2)*npn1*tau_i 
-    gaussian_term2 = np.exp(-0.5* float(opts.alphas) * (m.log(tau_i)-m.log(npm2)) ** 2 /nps2**2)*npn2*tau_i
-
-    gaussians =  gaussian_term1 - gaussian_term2
-    gaussians_norm = gaussians/expon_th
-    # Derivative of gaussian_term1 with respect to bins[0]
-    #gaussian_term1_derivative = gaussian_term1 * (-float(opts.alphas) * (tau_i - npm1) / nps1**2)
-    #gaussian_term2_derivative = gaussian_term2 * (-float(opts.alphas) * (tau_i - npm2) / nps2**2)
-    new_part = 1 / partd 
-    #print("new_part",new_part)
-    #print("new_part*(expon + gaussian_term1 - gaussian_term2)",new_part*(expon + gaussian_term1 - gaussian_term2))
-    return w_i*(new_part*expon*(partn + gaussians_norm))
+    sudth = np.exp( -(analytics.R_NLL(tau_i)) -  analytics.R_LL(tau_i))
+    gauss1 = np.exp(-0.5* (m.log(tau_i)-m.log(npm1)) ** 2 /nps1**2)*npn1*tau_i 
+    gauss2 = np.exp(-0.5* (m.log(tau_i)-m.log(npm2)) ** 2 /nps2**2)*npn2*tau_i
+    return w_i*expon*(partn + (gauss1-gauss2)/sudth)/partd
 
 import pandas as pd
 import numpy as np
