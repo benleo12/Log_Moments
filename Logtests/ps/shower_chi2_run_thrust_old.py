@@ -38,7 +38,7 @@ config.Blfac = args.B
 config.Ffac = args.F
 
 # Define a function to save parameters to a file
-def save_params(lambda_1, lambda_2, asif):
+def save_params(lambda_1,lambda_2, asif):
     filename = f"params_{args.piece}_{n_samp}_{seed}.txt"
     with open(filename, 'w') as f:
         f.write(f"lambda_1: {lambda_1}\n")
@@ -69,37 +69,37 @@ torch.set_num_threads(4)
 # Set the number of threads used for inter-op parallelism
 torch.set_num_interop_threads(4)
 
-alphas = [AlphaS(91.1876, asif, 0), AlphaS(91.1876, asif, 1)]
-analytics = nll_torch.NLL(alphas, a=1, b=1, t=91.1876**2, piece=args.piece)
+alphas = [ AlphaS(91.1876,asif,0), AlphaS(91.1876,asif,1) ]
+analytics = nll_torch.NLL(alphas,a=1,b=1,t=91.1876**2,piece=args.piece)
 
 
 # Define wLL and wNLL functions
 def wLL(tau):
-    partC = (analytics.R_LLp(tau) + analytics.R_NLLp(tau)) / tau
-    exponC = torch.exp(-analytics.R_LL(tau) - analytics.R_NLL(tau))
-    return partC * exponC
+    partC = (analytics.R_LLp(tau)+analytics.R_NLLp(tau))/tau
+    exponC = np.exp( -analytics.R_LL(tau)-analytics.R_NLL(tau) )
+    return partC*exponC
 
 def torch_quad(func, a, b, func_mul=None, func_mul2=None, num_steps=100000):
     x = torch.logspace(torch.log10(a), torch.log10(b), steps=num_steps, dtype=torch.float64)
-    dx = (x[1:] - x[:-1])
-    y = (func(x[1:]) + func(x[:-1])) / 2.
+    dx = (x[1:]-x[:-1])
+    y = (func(x[1:])+func(x[:-1]))/2.
     if func_mul is not None:
-        y *= (func_mul(x[1:]) + func_mul(x[:-1])) / 2.
+        y *= (func_mul(x[1:])+func_mul(x[:-1]))/2.
     if func_mul2 is not None:
-        y *= (func_mul2(x[1:]) + func_mul2(x[:-1])) / 2.
+        y *= (func_mul2(x[1:])+func_mul2(x[:-1]))/2.
     y_dx = y * dx
     integral = torch.sum(y_dx)
     return integral
 
-def run_pypy_script(pypy_script_path, asif, n_samp, piece):
+def run_pypy_script(pypy_script_path,asif,n_samp,piece):
     """Runs the PyPy script with specified flags that generates the CSV file."""
     # Define the additional flags as a list
-    flags = ['-e', str(n_samp), '-A', str(asif), '-b', '1', '-C', '1', '-x', str(piece), '-K', str(args.K), '-B', str(args.B), '-s', str(args.s)]
+    flags = ['-e',str(n_samp),'-A',str(asif),'-b','1','-C','1','-x',str(piece),'-K',str(args.K),'-B',str(args.B),'-s',str(args.s)]
 
     # Create the filename based on flags and ensure it includes "LL"
-    filename = [f"thrust_e{n_samp}_A{asif}_{args.piece}_K{args.K}_B{args.B}_seed{args.s}.csv",
-                f"weight_e{n_samp}_A{asif}_{args.piece}_K{args.K}_B{args.B}_seed{args.s}.csv"]
-
+    filename = [ f"thrust_e{n_samp}_A{asif}_{args.piece}_K{args.K}_B{args.B}_seed{args.s}.csv",
+                 f"weight_e{n_samp}_A{asif}_{args.piece}_K{args.K}_B{args.B}_seed{args.s}.csv" ]
+    
     # Check if the file already exists
     if os.path.exists(filename[0]):
         print(f"File {filename} already exists. Not overwriting.")
@@ -108,7 +108,7 @@ def run_pypy_script(pypy_script_path, asif, n_samp, piece):
     try:
         # Include the additional flags in the subprocess call
         subprocess.check_call(['pypy', pypy_script_path] + flags)
-
+        
         # Check if the expected output file exists and rename it
         if os.path.exists("thrust_values.csv"):
             os.rename("thrust_values.csv", filename[0])
@@ -116,11 +116,11 @@ def run_pypy_script(pypy_script_path, asif, n_samp, piece):
         else:
             print("Expected output file 'thrust_values.csv' not found.")
             return None
-
+        
     except subprocess.CalledProcessError as e:
         print("An error occurred while running the PyPy script:", e)
         return None
-
+    
     return filename
 
 def read_csv_to_torch(csv_file_paths):
@@ -140,80 +140,40 @@ def read_csv_to_torch(csv_file_paths):
 
 # Manual integration function using Riemann sum
 def mc_integration(integrand, tau_values, n_samp):
-    integral = torch.sum(integrand) / n_samp
+    integral = torch.sum(integrand)/n_samp
     return integral
 
 # Define the integral equations using the dataset directly
-def prep_integral_equation_2_direct(lambda_0, lambda_1, lambda_2, tau_i, n_samp, printit=False):
+def prep_integral_equation_2_direct(lambda_0,lambda_1, lambda_2, tau_i, n_samp,printit=False):
     n_bins = args.nbins
-    n_samp = int(list(tau_i.size())[0] / n_bins) * n_bins
+    n_samp = int(list(tau_i.size())[0]/n_bins)*n_bins
     tau_i = tau_i[:n_samp]
-    tau_i = tau_i[tau_i[:, 0].sort()[1]]
-    bins = tau_i[:, 0].reshape(n_bins, int(n_samp / n_bins))
-    wgts = tau_i[:, 1].reshape(n_bins, int(n_samp / n_bins))
+    tau_i = tau_i[tau_i[:,0].sort()[1]]
+    bins = tau_i[:,0].reshape(n_bins,int(n_samp/n_bins))
+    wgts = tau_i[:,1].reshape(n_bins,int(n_samp/n_bins))
     if printit:
-        print('NBins', n_bins, tau_i.size())
-    maxs, ids = torch.max(bins, 1)
-    mins, ids = torch.min(bins, 1)
-    #    if printit:
-    #        print('Params',mins)
-    #        print('Params',maxs)
-    #        print('Params',cens)
-    return [bins, wgts, mins, maxs, n_samp]
+        print('NBins',n_bins,tau_i.size())
+    maxs, ids = torch.max(bins,1)
+    mins, ids = torch.min(bins,1)
+#    if printit:
+#        print('Params',mins)
+#        print('Params',maxs)
+#        print('Params',cens)
+    return [bins,wgts,mins,maxs,n_samp]
 
-# Modified the integral_equation_2_direct function
-def integral_equation_2_direct(lambda_0, lambda_1, lambda_2, bins, printit=False):
-    total_weight = torch.sum(bins[1])
-    wgts = bins[1]
-
-        # Define wLL_func that depends on lambda_1 and lambda_2
-    def wLL_func(tau):
-        if args.piece == 'll':
-            partC = (analytics.R_LLp(tau)) / tau
-            exponC = torch.exp(- analytics.R_LL(tau))
-            return partC * exponC
-        if args.piece == 'nllc' or args.piece == 'nll1':
-            partC = (analytics.R_LLp(tau) + analytics.R_NLLp(tau)) / tau
-            exponC = torch.exp(- analytics.R_LL(tau) - analytics.R_NLL(tau))
-            return partC * exponC
-    
-    # Compute analytic moments via integration
-    min_tau = bins[2].min()
-    max_tau = bins[3].max()
-
-    CN = torch_quad(wLL_func, min_tau, max_tau)
-    CLL = torch_quad(wLL_func, min_tau, max_tau, func_mul=analytics.R_LL)
-    CNLL = torch_quad(wLL_func, min_tau, max_tau, func_mul=analytics.R_NLL)
-
-    analytic_R_LL = CLL / CN
-    analytic_R_NLL = CNLL / CN
-
+def integral_equation_2_direct(lambda_0,lambda_1, lambda_2, bins,printit=False):
+    integral = 0
     RLLp = analytics.R_LLp(bins[0])
     RNLLp = analytics.R_NLLp(bins[0])
-    if args.piece == 'll':
-        part = (CLL * RLLp) / ((CLL - lambda_1) * RLLp)
-        expon = torch.exp(-lambda_1 * analytics.R_LL(bins[0]))
-    if args.piece == 'nllc' or args.piece == 'nll1':
-        part = (CLL * RLLp + CNLL * RNLLp) / ((CLL - lambda_1) * RLLp + (CNLL - lambda_2) * RNLLp)
-        expon = torch.exp(-lambda_1 * analytics.R_LL(bins[0]) - lambda_2 * analytics.R_NLL(bins[0]))
-    vals = part*expon*wgts
-
-    # Compute data moments
-    data_R_LL = torch.sum(vals*analytics.R_LL(bins[0])) / bins[4]
-    data_R_NLL = torch.sum(vals*analytics.R_NLL(bins[0])) / bins[4]
-
-    loss = 0
-
-    # Compute loss
-    if args.piece == 'll':
-        loss = (data_R_LL - analytic_R_LL) ** 2
-    if args.piece == 'nllc' or args.piece == 'nll1':
-        loss = (data_R_LL - analytic_R_LL) ** 2 + (data_R_NLL - analytic_R_NLL) ** 2
-
+    part = (CLL*RLLp + CNLL*RNLLp)/((CLL-lambda_1)*RLLp + (CNLL-lambda_2)*RNLLp)
+    expon = torch.exp( -lambda_1*analytics.R_LL(bins[0])-lambda_2*analytics.R_NLL(bins[0]) )
+    vals = torch.sum(part*expon*bins[1],1)/bins[4]
+    anas  = np.exp( -analytics.R_LL(bins[3])-analytics.R_NLL(bins[3]) )
+    anas -= np.exp( -analytics.R_LL(bins[2])-analytics.R_NLL(bins[2]) )
+    integral = sum((vals-anas)**2)
     if printit:
-        print('Loss is', loss.item(), 'at', lambda_1.item(), lambda_2.item())
-
-    return loss
+        print('\\Chi^2 is',integral.item(),'at',lambda_1.item(),lambda_2.item())
+    return integral
 
 # Initialize the Lagrange multipliers
 lambda_0 = torch.tensor([0.0], requires_grad=True)
@@ -248,15 +208,15 @@ else:
 min_tau = tau_i.min(dim=0).values[0]
 max_tau = tau_i.max(dim=0).values[0]
 
-print("Tau min/max: ", min_tau.item(), max_tau.item())
+print("Tau min/max: ",min_tau.item(),max_tau.item())
 
-CN = torch_quad(wLL, min_tau, max_tau)
-CLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_LL)
+CN   = torch_quad(wLL, min_tau, max_tau)
+CLL  = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_LL)
 CNLL = torch_quad(wLL, min_tau, max_tau, func_mul=analytics.R_NLL)
 
-print("CN   =", CN)
-print("CLL  =", CLL)
-print("CNLL =", CNLL)
+print("CN   =",CN)
+print("CLL  =",CLL)
+print("CNLL =",CNLL)
 
 # Define the optimizer
 defrate = 0.01
@@ -265,47 +225,46 @@ if args.piece == 'll':
 if args.piece == 'nllc' or args.piece == 'nll1':
     optimizer = optim.Adam([{'params': lambda_2, 'lr': defrate}])
 
-bins = prep_integral_equation_2_direct(lambda_0, lambda_1, lambda_2, tau_i, n_samp, True)
+bins = prep_integral_equation_2_direct(lambda_0, lambda_1, lambda_2, tau_i, n_samp,True)
 
 integral_equation_2_direct(lambda_0, lambda_1, lambda_2, bins, True)
 
 for step in range(1000000):
 
-    # print(f"Running optimization step {step+1}")
+    #print(f"Running optimization step {step+1}")
 
     optimizer.zero_grad()
     loss = torch.abs(integral_equation_2_direct(lambda_0, lambda_1, lambda_2, bins))
 
     if torch.isnan(loss):
-        continue
+     continue
     loss.backward()
     optimizer.step()
-    #    with torch.no_grad():
-    #        lambda_2 = lambda_2.clamp(min=0)
+#    with torch.no_grad():
+#        lambda_2 = lambda_2.clamp(min=0)
 
-    print("Step {}, Loss: {}, Lambda 0: {}, Lambda 1: {}, Lambda 2: {}\r".format(
-        step, loss.item(), lambda_0.item(), lambda_1.item(), lambda_2.item()), end='', flush=True)
+    print("Step {}, Loss: {}, Lambda 0: {}, Lambda 1: {}, Lambda 2: {}\r".format(step,loss.item(),lambda_0.item(),lambda_1.item(),lambda_2.item()), end='', flush=True)
 
-    # if step >0 and step % (n_step+5) == 0:
-    # print(f"Step {step}, Loss: {loss.item()}, Lambda 0: {lambda_0.item()}, Lambda 1: {lambda_1.item()}, Lambda 2: {lambda_2.item()}")
-    n_samp = int(n_samp * samp_fac)
-    n_step = int(n_step / step_frac)
+    #if step >0 and step % (n_step+5) == 0:
+    #print(f"Step {step}, Loss: {loss.item()}, Lambda 0: {lambda_0.item()}, Lambda 1: {lambda_1.item()}, Lambda 2: {lambda_2.item()}")
+    n_samp = int(n_samp*samp_fac)
+    n_step = int(n_step/step_frac)
     # print("n_step = ", n_step)
     lambda_1_values.append(lambda_1.item())
     lambda_2_values.append(lambda_2.item())
     loss_values.append(loss.item())
     n_samp_values.append(n_samp)
-    # if n_step <= 5:
+    #if n_step <= 5:
     #    break
 
     # Save parameters if loss doesn't change
-    if step > 0 and abs(loss.item() - loss_values[step - 1]) < 1e-20:
-        save_params(lambda_1.item(), lambda_2.item(), asif)
+    if step > 0 and abs(loss.item() - loss_values[step-1]) < 1e-20:
+        save_params(lambda_1.item(),lambda_2.item(), asif)
         break
-
-    #    if step > 0 and loss.item() < min_loss:
-    #        save_params(lambda_2.item(), asif)
-    #        break
+    
+#    if step > 0 and loss.item() < min_loss:
+#        save_params(lambda_2.item(), asif)
+#        break
 
 print("")
 print(f"Final Lambda 0: {lambda_0.item()}, Final Lambda 1: {lambda_1.item()}, Final Lambda 2: {lambda_2.item()}")
