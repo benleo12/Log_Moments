@@ -25,6 +25,7 @@ class NLL:
         self.Bl = -3./4.
         self.K *= config.Kfac
         self.Bl *= config.Blfac
+        self.F = config.Ffac
         self.nf = alpha[0].nf
         if piece == 'll':
             self.K = 0
@@ -36,6 +37,7 @@ class NLL:
             self.Bl = 0
         elif piece == 'nll1':
             self.F = 0
+            self.K = 0
 
     def fuzzymin(self,v,maxv):
         if isinstance(v,torch.Tensor):
@@ -108,7 +110,7 @@ class NLL:
             (self.r(self.as0,self.b0,self.b1,self.K,self.a,self.b,L)+\
              self.Bl*self.T(self.as0,self.b0,L/(self.a+self.b)))
 
-    def R_Lpp(self,v):
+    def R_LLpp(self,v):
         L = m.log(1./v)
         return 2.*CF*\
             (self.Tp(self.as0,self.b0,L/self.a)/self.a
@@ -116,13 +118,48 @@ class NLL:
 
     def logF(self,v):
         if self.F == 0: return 0
-        rp = self.R_Lp(v)
+        rp = self.R_LLp(v)
         ge = 0.5772156649015329
-        return -ge*rp - m.lgamma(1.+rp)
+        return ge*rp + m.lgamma(1.+rp)
 
     def FpF(self,v):
         if self.F == 0: return 0
-        rp = self.R_Lp(v)
-        rpp = self.R_Lpp(v)
+        rp = self.R_LLp(v)
+        rpp = self.R_LLpp(v)
         ge = 0.5772156649015329
-        return -(ge + sp.digamma(1 + rp))*rpp
+        return (ge + sp.digamma(1 + rp))*rpp
+    
+    # separating into pieces
+
+    def R_NLLc(self,v):
+        self.Bl = 0
+        L = m.log(1./v)
+        L = self.fuzzymin(L,.5/(self.as0*self.b0))
+        return 2.*CF*\
+            (self.r2(self.as0,self.b0,self.b1,self.K,self.a,self.b,L)+\
+             self.Bl*self.T(self.as0,self.b0,L/(self.a+self.b)))
+
+    def R_NLLcp(self,v):
+        self.Bl = 0
+        L = m.log(1./v)
+        L = self.fuzzymin(L,.5/(self.as0*self.b0))
+        return 2.*CF*\
+            (self.r2p(self.as0,self.b0,self.b1,self.K,self.a,self.b,L)+
+             self.Bl*self.Tp(self.as0,self.b0,L/(self.a+self.b))/(self.a+self.b))
+
+    
+    def R_NLLB(self,v):
+        self.K = 0
+        L = m.log(1./v)
+        L = self.fuzzymin(L,.5/(self.as0*self.b0))
+        return 2.*CF*\
+            (self.r2(self.as0,self.b0,self.b1,self.K,self.a,self.b,L)+\
+             self.Bl*self.T(self.as0,self.b0,L/(self.a+self.b)))
+
+    def R_NLLBp(self,v):
+        self.K = 0
+        L = m.log(1./v)
+        L = self.fuzzymin(L,.5/(self.as0*self.b0))
+        return 2.*CF*\
+            (self.r2p(self.as0,self.b0,self.b1,self.K,self.a,self.b,L)+
+             self.Bl*self.Tp(self.as0,self.b0,L/(self.a+self.b))/(self.a+self.b))

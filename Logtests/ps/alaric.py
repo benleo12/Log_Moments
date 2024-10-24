@@ -35,12 +35,14 @@ class Soft:
         skj = pk.SmallMLDP(pj)
         D = sij*(pk*n)+skj*(pi*n)
         if D == 0: return mn(0)
-        A = 2*sik*(pi*n)/D/(z[0]+z[1])*(1+self.alpha[1](t)/(2*m.pi)*K*config.Kfac)
+        #A = 2*sik*(pi*n)/D/(z[0]+z[1])*(1+self.alpha[1](t)/(2*m.pi)*K*config.Kfac)
+        A = 2*sik*(pi*n)/D*(1+self.alpha[1](t)/(2*m.pi)*K*config.Kfac)
         return self.Ca*A
     def Estimate(self,z,ip):
+        # return self.Ca*4/(-z[1])*(1+self.alphamax/(2*m.pi)*K*config.Kfac)
         return self.Ca*4/(-z[1])*(1+self.alphamax/(2*m.pi)*K*config.Kfac)
     def Integral(self,ip):
-        return self.Ca*4*mylog(1/ip[-1])*(1+self.alphamax/(2*m.pi)*K*config.Kfac)
+         return self.Ca*4*mylog(1/ip[-1])*(1+self.alphamax/(2*m.pi)*K*config.Kfac)
     def GenerateZ(self,ip):
         return [mn(1),-mypow(ip[-1],rng.random())]
 
@@ -53,7 +55,8 @@ class Coll:
 class Cqq (Coll):
 
     def Value(self,z,pi,pj,pk,e,t):
-        return self.Ca*(-2+1-z[1])*config.Blfac
+        #return self.Ca*(-2+1-z[1])*config.Blfac
+        return self.Ca*(1-z[1])*config.Blfac
     def Estimate(self,z,ip):
         return self.Ca*2.*config.Blfac
     def Integral(self,ip):
@@ -64,7 +67,8 @@ class Cqq (Coll):
 class Cgg (Coll):
 
     def Value(self,z,pi,pj,pk,e,t):
-        return self.Ca*(-2+z[1]*(1-z[1]))
+        #return self.Ca*(-2+z[1]*(1-z[1]))
+        return self.Ca*(z[1]*(1-z[1]))
     def Estimate(self,z,ip):
         return self.Ca*2.
     def Integral(self,ip):
@@ -352,6 +356,8 @@ if __name__== "__main__":
     parser.add_option("-l","--logfile",default="",dest="logfile")
     parser.add_option("-K","--Kfactor",default=1,dest="Kfac")
     parser.add_option("-B","--Blfactor",default=1,dest="Blfac")
+    parser.add_option("-x","--piece",default='all',dest="piece")
+    parser.add_option("-F","--Ffactor",default=1,dest="Ffac")
     (opts,args) = parser.parse_args()
 
     opts.histo = opts.histo.format(**vars(opts))
@@ -373,9 +379,29 @@ if __name__== "__main__":
     ecms = mn(opts.ecms)
     lam = mn(opts.asmz)/mn(opts.alphas)
     t0 = mypow(mn(opts.cut)/ecms**2,lam)*ecms**2
-    alphas = AlphaS(ecms,mn(opts.alphas),int(opts.order),mb=1e-3,mc=1e-4)
-    print("t_0 = {0}, log(Q^2/t_0) = {1}, \\alpha_s(t_0) = {2}". \
-          format(t0,mylog(ecms**2/t0),alphas(t0)))
+    
+    if opts.piece == 'll':
+        K=0
+        opts.nem=1
+        opts.coll=0
+        opts.order=0
+    elif opts.piece == 'nllc':
+        opts.nem=1
+        opts.coll=0
+        opts.order=1
+    elif opts.piece == 'nll1':
+        K=0
+        opts.nem=1
+        opts.order=1
+    elif opts.piece == 'all':
+        opts.nem=16
+        opts.order=1
+
+    alphas = AlphaS(ecms,mn(opts.alphas),int(opts.order))#,mb=1e-3,mc=1e-4)
+    alphas = [ AlphaS(ecms,mn(opts.alphas),int(opts.order)),
+               AlphaS(ecms,mn(opts.alphas),0) ]
+    print("t_0 = {0}, log(Q^2/t_0) = {1}, \\alpha_s(t_0) = {2} / {3}". \
+          format(t0,mylog(ecms**2/t0),alphas[0](t0),alphas[1](t0)))
     shower = Shower(alphas,t0,int(opts.coll),mn(opts.beta),
                     mn(opts.rcut),int(opts.nmax),opts.lc)
     jetrat = SimplifiedAnalysis(-0.0033)

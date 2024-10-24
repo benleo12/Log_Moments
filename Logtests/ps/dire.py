@@ -32,7 +32,8 @@ class Soft (Kernel):
 
     def Value(self,z,y,t):
         if -z[1]/y < 1: return 0.
-        return self.Ca*2./(-z[1])*(1+self.alpha[1](t)/(2*m.pi)*K*config.Kfac)
+        #return self.Ca*2./(-z[1])*(1+self.alpha[1](t)/(2*m.pi)*K*config.Kfac)
+        return self.Ca*(1+z[1])*2./(-z[1])*(1+self.alpha[1](t)/(2*m.pi)*K*config.Kfac)
     def Estimate(self,z,k02):
         return self.Ca*2./(-z[1])*(1+self.alphamax/(2*m.pi)*K*config.Kfac)
     def Integral(self,k02):
@@ -46,7 +47,8 @@ class Soft (Kernel):
 class Cqq (Kernel):
 
     def Value(self,z,y,t):
-        return self.Ca*(-2+1-z[1])*config.Blfac
+        #return self.Ca*(-2+1-z[1])*config.Blfac
+        return self.Ca*(1-z[1])*config.Blfac
     def Estimate(self,z,k02):
         return self.Ca*2.*config.Blfac
     def Integral(self,k02):
@@ -57,7 +59,8 @@ class Cqq (Kernel):
 class Cgg (Kernel):
 
     def Value(self,z,y,t):
-        return self.Ca*(-2+z[1]*(1-z[1]))
+        #return self.Ca*(-2+z[1]*(1-z[1]))
+        return self.Ca*(z[1]*(1-z[1]))
     def Estimate(self,z,k02):
         return self.Ca*2.
     def Integral(self,k02):
@@ -329,6 +332,7 @@ if __name__== "__main__":
     parser.add_option("-x","--piece",default="all",dest="piece")
     parser.add_option("-K","--Kfactor",default=1,dest="Kfac")
     parser.add_option("-B","--Blfactor",default=1,dest="Blfac")
+    parser.add_option("-F","--Ffactor",default=1,dest="Ffac")
     (opts,args) = parser.parse_args()
 
     opts.histo = opts.histo.format(**vars(opts))
@@ -361,7 +365,11 @@ if __name__== "__main__":
         opts.coll=0
         opts.order=1
     elif opts.piece == 'nll1':
+        K=0
         opts.nem=1
+        opts.order=1
+    elif opts.piece == 'all':
+        opts.nem=16
         opts.order=1
 
     alphas = [ AlphaS(ecms,mn(opts.alphas),int(opts.order)),

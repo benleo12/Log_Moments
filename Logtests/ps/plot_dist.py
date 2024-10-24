@@ -31,6 +31,7 @@ parser.add_option("-l","--logfile",default="",dest="logfile")
 parser.add_option("-x","--piece",default="all",dest="piece")
 parser.add_option("-K","--Kfactor",default=1,dest="Kfac")
 parser.add_option("-B","--Blfactor",default=1,dest="Blfac")
+parser.add_option("-F","--Ffactor",default=1,dest="Ffac")
 (opts,args) = parser.parse_args()
 
 opts.histo = opts.histo.format(**vars(opts))
@@ -41,6 +42,7 @@ import config
 config.quad_precision = int(opts.quad)
 config.Kfac = float(opts.Kfac)
 config.Blfac = float(opts.Blfac)
+config.Ffac = float(opts.Ffac)
 from mymath import *
 print_math_settings()
 
@@ -73,10 +75,10 @@ elif opts.piece == 'nll1':
 alphas = [ AlphaS(ecms,mn(opts.alphas),int(opts.order)),
            AlphaS(ecms,mn(opts.alphas),0) ]
 
-def run_pypy_script(pypy_script_path, asif, n_samp, piece, kfac, blfac):
-    flags = ['-e', str(n_samp), '-A', str(asif), '-b', '1', '-C', '0.1','-x',str(piece),'-K',str(kfac),'-B',str(blfac)]
-    filename = [ f"thrust_e{n_samp}_A{asif}_{opts.piece}_K{kfac}_B{blfac}.csv",
-                 f"weight_e{n_samp}_A{asif}_{opts.piece}_K{kfac}_B{blfac}.csv" ]
+def run_pypy_script(pypy_script_path, asif, n_samp, piece, kfac, blfac,Ffac):
+    flags = ['-e', str(n_samp), '-A', str(asif), '-b', '1', '-C', '1','-x',str(piece),'-K',str(kfac),'-B',str(blfac),'-F',str(Ffac)]
+    filename = [ f"thrust_e{n_samp}_A{asif}_{opts.piece}_K{kfac}_B{blfac}_F{Ffac}.csv",
+                 f"weight_e{n_samp}_A{asif}_{opts.piece}_K{kfac}_B{blfac}_F{Ffac}.csv" ]
     print('Input files:',filename)
     if os.path.exists(filename[0]):
         with open(filename[0], 'r') as csvfile:
@@ -97,15 +99,16 @@ def run_pypy_script(pypy_script_path, asif, n_samp, piece, kfac, blfac):
         wgt_values = [float(row[0]) for row in csv_reader]
     return tau_values, wgt_values
 
-pypy_script_path = os.path.expanduser('dire.py')
+pypy_script_path = os.path.expanduser('alaric.py')
 thrust_values, weight_values = run_pypy_script(pypy_script_path,
-    opts.alphas, opts.events, opts.piece, opts.Kfac, opts.Blfac)
+    opts.alphas, opts.events, opts.piece, opts.Kfac, opts.Blfac, opts.Ffac)
 
 import matplotlib.pyplot as plt
 from scipy.integrate import quad
 # Integration range
 min_tau = min([ i if i>0. else 1. for i in thrust_values ])
-max_tau = 0.999
+max_tau = 0.9999
+#min_tau = 10**(-2.7)
 
 analytics = nll.NLL(alphas,a=1,b=1,t=ecms**2,piece=opts.piece)
 
@@ -143,19 +146,21 @@ def wNLL(tau_values):
 
 # Numerical integration
 CLL0, _ = quad(lambda t: wNLL(t), min_tau, max_tau)
-CNLL, _ = quad(lambda t: wNLL(t) * ((analytics.R_NLL(t)-analytics.logF(t))), min_tau, max_tau)
+CNLL, _ = quad(lambda t: wNLL(t) * ((analytics.R_NLL(t))), min_tau, max_tau)
+CNLL_F, _ = quad(lambda t: wNLL(t) * ((analytics.logF(t))), min_tau, max_tau)
 CLL, _ = quad(lambda t: wNLL(t) * (analytics.R_LL(t)), min_tau, max_tau)
 
 lambda_0 = 0.0
-lambda_1, lambda_2, npm1, npm2, nps1, nps2, npn1, npn2 = 0.008303365196098627, 0.028592561718013335, 0.30143915006392746, 0.300065001025007, 0.07008604234713191, 0.23260547429703668, 0.07165096510758996, 0.13307553088856458
+lambda_1, lambda_2, lambda_3, npm1, npm2, nps1, nps2, npn1, npn2 = 0.0, 0.0, 0.0, 0.48033, 0.048427, 0.06192, 0.32, 0.34, 0.44
 
 def weight(tau_i,w_i):
     RLLp = analytics.R_LLp(tau_i)
     RNLLp = analytics.R_NLLp(tau_i)
-    partn = (CLL * RLLp + CNLL * RNLLp) 
-    partd = ((CLL - lambda_1) * RLLp + (CNLL - lambda_2) * RNLLp)
-    expon = np.exp( - lambda_1*(analytics.R_NLL(tau_i)) -  lambda_2*analytics.R_LL(tau_i))
-    sudth = np.exp( -(analytics.R_NLL(tau_i)) -  analytics.R_LL(tau_i))
+    FpF = analytics.FpF(tau_i)
+    partn = (CLL * RLLp + CNLL * RNLLp + CNLL_F * FpF) 
+    partd = ((CLL - lambda_1) * RLLp + (CNLL - lambda_2) * RNLLp + (CNLL_F - lambda_3) * FpF)
+    expon = np.exp( - lambda_1*(analytics.R_NLL(tau_i)) -  lambda_2*analytics.R_LL(tau_i) -  lambda_3*analytics.logF(tau_i))
+    sudth = np.exp( -(analytics.R_NLL(tau_i)) -  analytics.R_LL(tau_i) - analytics.logF(tau_i))
     gauss1 = np.exp(-0.5* (m.log(tau_i)-m.log(npm1)) ** 2 /nps1**2)*npn1*tau_i 
     gauss2 = np.exp(-0.5* (m.log(tau_i)-m.log(npm2)) ** 2 /nps2**2)*npn2*tau_i
     return w_i*expon*(partn + (gauss1-gauss2)/sudth)/partd

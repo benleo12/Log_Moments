@@ -20,10 +20,11 @@ plt.rcParams.update({
 })
 
 # Define the values of asif and evs to iterate over
-asif_values = [0.08]  # You can expand this list as needed, e.g., [0.01, 0.0075, 0.005, 0.0025]
-evs = 500000
-N = 2    # Number of runs with different seeds
-B = 500  # Number of bootstrap samples
+asif_values = [0.118]  # You can expand this list as needed, e.g., [0.01, 0.0075, 0.005, 0.0025]
+evs = 100000  # Number of events
+N = 5    # Number of runs with different seeds
+B = 50  # Number of bootstrap samples
+piece = 'all'  # Specify the piece to run, e.g., 'nllc', 'll', 'nll1'
 
 # Define a fixed lambda_1 value since LL is not being run
 fixed_lambda_1 = 0.0  # Adjust this value based on your requirements
@@ -37,11 +38,11 @@ def run_nllc_script(asif, seed, lambda_1_fixed):
         'python3', 'shower_chi2_run_thrust_nuiss.py',
         '--asif', str(asif),
         '--e', str(evs),
-        '--piece', 'nllc',
+        '--piece', piece,
         '--nbins', '1',
         '-K', '1',
         '-C', '1',
-        '-B', '0.0',
+        '-B', '1',
         '--lam1', str(lambda_1_fixed),  # Use a fixed lambda_1
         '-s', str(seed)
     ]
@@ -52,7 +53,7 @@ def run_nllc_script(asif, seed, lambda_1_fixed):
         print(f"An error occurred while running the NLLc script with asif={asif}, seed={seed}: {e}")
 
 # Function to perform bootstrap resampling and compute confidence intervals
-def bootstrap_ci(data, n_bootstrap_samples=1000, ci=95):
+def bootstrap_ci(data, n_bootstrap_samples=B, ci=95):
     """Generate bootstrap confidence intervals for the mean."""
     bootstrapped_means = []
     n = len(data)
@@ -71,8 +72,8 @@ nllc_results = {asif: {param: [] for param in parameters} for asif in asif_value
 # Function to delete existing CSV files to ensure fresh runs
 def delete_existing_csv(asif, seed):
     csv_filenames = [
-        f"thrust_e{evs}_A{asif}_nllc_K1.0_B0.0_seed{seed}.csv",
-        f"weight_e{evs}_A{asif}_nllc_K1.0_B0.0_seed{seed}.csv"
+        f"thrust_e{evs}_A{asif}_{piece}_K1.0_B1.0.csv",
+        f"weight_e{evs}_A{asif}_{piece}_K1.0_B1.0.csv"
     ]
     for csv_file in csv_filenames:
         if os.path.exists(csv_file):
@@ -94,8 +95,8 @@ for asif in asif_values:
         run_nllc_script(asif, seed, fixed_lambda_1)
         
         # Define original and new filenames for params
-        original_params_filename = f'params_nllc_{evs}.txt'
-        new_params_filename = f'params_nllc_{evs}_{seed}.txt'
+        original_params_filename = f'params_{piece}_{evs}.txt'
+        new_params_filename = f'params_{piece}_{evs}_{seed}.txt'
         
         # Rename the params file to include the seed
         if os.path.exists(original_params_filename):
