@@ -76,7 +76,7 @@ alphas = [ AlphaS(ecms,mn(opts.alphas),int(opts.order)),
            AlphaS(ecms,mn(opts.alphas),0) ]
 
 def run_pypy_script(pypy_script_path, asif, n_samp, piece, kfac, blfac,Ffac):
-    flags = ['-e', str(n_samp), '-A', str(asif), '-b', '1', '-C', '1','-x',str(piece),'-K',str(kfac),'-B',str(blfac),'-F',str(Ffac)]
+    flags = ['-e', str(n_samp), '-A', str(asif), '-b', '1', '-C', '1.0','-x',str(piece),'-K',str(kfac),'-B',str(blfac),'-F',str(Ffac)]
     filename = [ f"thrust_e{n_samp}_A{asif}_{opts.piece}_K{kfac}_B{blfac}_F{Ffac}.csv",
                  f"weight_e{n_samp}_A{asif}_{opts.piece}_K{kfac}_B{blfac}_F{Ffac}.csv" ]
     print('Input files:',filename)
@@ -151,7 +151,7 @@ CNLL_F, _ = quad(lambda t: wNLL(t) * ((analytics.logF(t))), min_tau, max_tau)
 CLL, _ = quad(lambda t: wNLL(t) * (analytics.R_LL(t)), min_tau, max_tau)
 
 lambda_0 = 0.0
-lambda_1, lambda_2, lambda_3, npm1, npm2, nps1, nps2, npn1, npn2 = 0.0, 0.0, 0.0, 0.48033, 0.048427, 0.06192, 0.32, 0.34, 0.44
+lambda_1, lambda_2, lambda_3, npm1, npm2, nps1, nps2, npn1, npn2 = 0.0, 0.0, 0.0, -0.004, 0.001, 0.001, 0.013, 0.018, 0.018
 
 def weight(tau_i,w_i):
     RLLp = analytics.R_LLp(tau_i)
@@ -161,8 +161,10 @@ def weight(tau_i,w_i):
     partd = ((CLL - lambda_1) * RLLp + (CNLL - lambda_2) * RNLLp + (CNLL_F - lambda_3) * FpF)
     expon = np.exp( - lambda_1*(analytics.R_NLL(tau_i)) -  lambda_2*analytics.R_LL(tau_i) -  lambda_3*analytics.logF(tau_i))
     sudth = np.exp( -(analytics.R_NLL(tau_i)) -  analytics.R_LL(tau_i) - analytics.logF(tau_i))
-    gauss1 = np.exp(-0.5* (m.log(tau_i)-m.log(npm1)) ** 2 /nps1**2)*npn1*tau_i 
-    gauss2 = np.exp(-0.5* (m.log(tau_i)-m.log(npm2)) ** 2 /nps2**2)*npn2*tau_i
+    #gauss1 = np.exp(-0.5* (m.log(tau_i)-m.log(npm1)) ** 2 /nps1**2)*npn1*tau_i 
+    #gauss2 = np.exp(-0.5* (m.log(tau_i)-m.log(npm2)) ** 2 /nps2**2)*npn2*tau_i
+    gauss1 = np.exp(-npm1*tau_i*np.log(tau_i) - npm2*tau_i*np.log(tau_i)**2 - nps1*tau_i*np.log(tau_i)**3 )
+    gauss2 = np.exp(-nps2*tau_i**2*np.log(tau_i) - npn1*tau_i**2*np.log(tau_i)**2 - npn2*tau_i**2*np.log(tau_i)**3 )
     return w_i*expon*(partn + (gauss1-gauss2)/sudth)/partd
 
 import pandas as pd
